@@ -6,6 +6,8 @@ from MODEL import *
 from FUNCTION import *
 from EVALUATION import *
 
+tf.compat.v1.disable_eager_execution()
+tf.compat.v1.disable_resource_variables()
 os.environ["CUDA_VISIBLE_DEVICES"] = FLAGS['num_gpu']
 sys.stdout = Tee(sys.stdout, open(FLAGS['txt_log'], 'a+'))
 
@@ -23,15 +25,15 @@ netG_act_o_1 = dict(size=2, index=0)
 netG_act_o_2 = dict(size=2, index=1)
 netD_act_o   = dict(size=1, index=0)
 
-with tf.name_scope(netG.name):
-    with tf.variable_scope(netG.variable_scope_name) as scope_full:
-        with tf.variable_scope(netG.variable_scope_name + 'B') as scopeB:
+with tf.compat.v1.name_scope(netG.name):
+    with tf.compat.v1.variable_scope(netG.variable_scope_name) as scope_full:
+        with tf.compat.v1.variable_scope(netG.variable_scope_name + 'B') as scopeB:
             netG_train_output2 = model(netG, train_df.input2, True, netG_act_o_1, is_first=True)
             scopeB.reuse_variables()
             netG_test_output2  = model(netG, test_df.input2, False, netG_act_o_1)
             netG_train_output2_for_netD = model(netG, train_df.input2, False, netG_act_o_1)
 
-        with tf.variable_scope(netG.variable_scope_name + 'A') as scopeA:
+        with tf.compat.v1.variable_scope(netG.variable_scope_name + 'A') as scopeA:
             netG_train_output1 = model(netG, train_df.input1, True, netG_act_o_1, is_first=True)
             scopeA.reuse_variables()
             netG_test_output1  = model(netG, test_df.input1, False, netG_act_o_1)
@@ -39,31 +41,31 @@ with tf.name_scope(netG.name):
             netG_train_output2_inv = model(netG, tf.clip_by_value(netG_train_output2, 0, 1),  True, netG_act_o_2)
             netG_test_output2_inv  = model(netG, tf.clip_by_value(netG_test_output2,  0, 1), False, netG_act_o_2)
 
-        with tf.variable_scope(netG.variable_scope_name + 'B') as scopeB:
+        with tf.compat.v1.variable_scope(netG.variable_scope_name + 'B') as scopeB:
             scopeB.reuse_variables()
             netG_train_output1_inv = model(netG, tf.clip_by_value(netG_train_output1, 0, 1),  True, netG_act_o_2)
             netG_test_output1_inv  = model(netG, tf.clip_by_value(netG_test_output1,  0, 1), False, netG_act_o_2)
 
-gp_weight_1 = tf.placeholder(tf.float32)
-gp_weight_2 = tf.placeholder(tf.float32)
+gp_weight_1 = tf.compat.v1.placeholder(tf.float32)
+gp_weight_2 = tf.compat.v1.placeholder(tf.float32)
 def wgan_gp(fake_data, real_data):
     fake_data = tf.reshape(fake_data, [FLAGS['data_train_batch_size'], -1])
     real_data = tf.reshape(real_data, [FLAGS['data_train_batch_size'], -1])
-    alpha = tf.random_uniform(shape=[FLAGS['data_train_batch_size'], 1], minval=0., maxval=1., seed=FLAGS['process_random_seed'])
+    alpha = tf.random.uniform(shape=[FLAGS['data_train_batch_size'], 1], minval=0., maxval=1., seed=FLAGS['process_random_seed'])
     differences = fake_data - real_data
     interpolates = real_data + (alpha*differences)
     interpolates_D = tf.reshape(interpolates, [FLAGS['data_train_batch_size'], FLAGS['data_image_size'], FLAGS['data_image_size'], FLAGS['data_image_channel']])
-    gradients = tf.gradients(model(netD, interpolates_D, True, netD_act_o), [interpolates])[0]
-    slopes = tf.sqrt(tf.reduce_sum(tf.square(gradients), reduction_indices=[1]))
+    gradients = tf.gradients(ys=model(netD, interpolates_D, True, netD_act_o), xs=[interpolates])[0]
+    slopes = tf.sqrt(tf.reduce_sum(input_tensor=tf.square(gradients), axis=[1]))
     if FLAGS['loss_wgan_use_g_to_one']:
-        gradient_penalty = -tf.reduce_mean((slopes-1.)**2)
+        gradient_penalty = -tf.reduce_mean(input_tensor=(slopes-1.)**2)
     else:
-        gradient_penalty = -tf.reduce_mean(tf.maximum(0., slopes-1.))
+        gradient_penalty = -tf.reduce_mean(input_tensor=tf.maximum(0., slopes-1.))
     return gradient_penalty
 
-with tf.name_scope(netD.name):
-    with tf.variable_scope(netD.variable_scope_name) as scope_full:
-        with tf.variable_scope(netD.variable_scope_name + 'A') as scopeA:
+with tf.compat.v1.name_scope(netD.name):
+    with tf.compat.v1.variable_scope(netD.variable_scope_name) as scope_full:
+        with tf.compat.v1.variable_scope(netD.variable_scope_name + 'A') as scopeA:
             netD_train_output1_1 = model(netD, netG_train_output1_for_netD, True, netD_act_o, is_first=True)
             scopeA.reuse_variables()
             netD_train_output2_1 = model(netD, train_df.input2, True, netD_act_o)
@@ -74,15 +76,15 @@ with tf.name_scope(netD.name):
             # wgan-gp
             if FLAGS['loss_wgan_gp_use_all']:
                 assert False, 'not yet'
-                gradient_penalty = tf.reduce_mean(tf.pack([(\
+                gradient_penalty = tf.reduce_mean(input_tensor=tf.stack([(\
                     wgan_gp(netD_train_input1, netD_train_input2) + wgan_gp(train_df.input1, netD_train_input1) + wgan_gp(train_df.input1, netD_train_input2)) / 3.0 \
                 for _ in range(FLAGS['loss_wgan_gp_times'])]))
             else:
                 w_list = []
                 for _ in range(FLAGS['loss_wgan_gp_times']):
                     w_list.append(wgan_gp(netG_train_output1_for_netD, train_df.input2))
-                gradient_penalty_1 = tf.reduce_mean(tf.pack(w_list)) * gp_weight_1
-        with tf.variable_scope(netD.variable_scope_name + 'B') as scopeB:
+                gradient_penalty_1 = tf.reduce_mean(input_tensor=tf.stack(w_list)) * gp_weight_1
+        with tf.compat.v1.variable_scope(netD.variable_scope_name + 'B') as scopeB:
             netD_train_output1_2 = model(netD, train_df.input1, True, netD_act_o, is_first=True)
             scopeB.reuse_variables()
             netD_train_output2_2 = model(netD, netG_train_output2_for_netD, True, netD_act_o)
@@ -93,27 +95,27 @@ with tf.name_scope(netD.name):
             # wgan-gp
             if FLAGS['loss_wgan_gp_use_all']:
                 assert False, 'not yet'
-                gradient_penalty = tf.reduce_mean(tf.pack([(\
+                gradient_penalty = tf.reduce_mean(input_tensor=tf.stack([(\
                     wgan_gp(netD_train_input1, netD_train_input2) + wgan_gp(train_df.input1, netD_train_input1) + wgan_gp(train_df.input1, netD_train_input2)) / 3.0 \
                 for _ in range(FLAGS['loss_wgan_gp_times'])]))
             else:
                 w_list = []
                 for _ in range(FLAGS['loss_wgan_gp_times']):
                     w_list.append(wgan_gp(netG_train_output2_for_netD, train_df.input1))
-                gradient_penalty_2 = tf.reduce_mean(tf.pack(w_list)) * gp_weight_2
+                gradient_penalty_2 = tf.reduce_mean(input_tensor=tf.stack(w_list)) * gp_weight_2
 
 save_net(netG.parameter_names, FLAGS['netG_mat'])
 save_net(netD.parameter_names, FLAGS['netD_mat'])
 
 assert len(netD.weights+netG.weights) == len(netD.parameter_names+netG.parameter_names), 'len(weights) != len(parameters)'
-saver = tf.train.Saver(var_list=netD.weights+netG.weights, max_to_keep=None)
+saver = tf.compat.v1.train.Saver(var_list=netD.weights+netG.weights, max_to_keep=None)
 
 netG_r_loss = regularization_cost(netG)
 netD_r_loss = regularization_cost(netD)
 netG_w_regularization_loss = netG_r_loss * netG.REGULARIZATION_WEIGHT
 netD_w_regularization_loss = netD_r_loss * netD.REGULARIZATION_WEIGHT
 
-with tf.name_scope("Loss"):
+with tf.compat.v1.name_scope("Loss"):
     netG_train_output1_crop = [tf_crop_rect(netG_train_output1, train_df.mat1, i) for i in range(FLAGS['data_train_batch_size'])]
     netG_train_output2_crop = [tf_crop_rect(netG_train_output2, train_df.mat2, i) for i in range(FLAGS['data_train_batch_size'])]
     netG_train_input1_crop  = [tf_crop_rect(train_df.input1,    train_df.mat1, i) for i in range(FLAGS['data_train_batch_size'])]
@@ -129,22 +131,22 @@ with tf.name_scope("Loss"):
 
     if FLAGS['loss_source_data_term_weight'] > 0:
         if FLAGS['loss_source_data_term'] == 'l2':
-            train_data_term_1 = -tf.reduce_mean(tf.pack([img_L2_loss(a, b, FLAGS['loss_data_term_use_local_weight']) for a, b in zip(netG_train_output1_crop, netG_train_input1_crop)])) * FLAGS['loss_source_data_term_weight']
+            train_data_term_1 = -tf.reduce_mean(input_tensor=tf.stack([img_L2_loss(a, b, FLAGS['loss_data_term_use_local_weight']) for a, b in zip(netG_train_output1_crop, netG_train_input1_crop)])) * FLAGS['loss_source_data_term_weight']
             test_data_term_1  = -img_L2_loss(netG_test_output1_crop, netG_test_input1_crop, FLAGS['loss_data_term_use_local_weight']) * FLAGS['loss_source_data_term_weight']
-            train_data_term_2 = -tf.reduce_mean(tf.pack([img_L2_loss(a, b, FLAGS['loss_data_term_use_local_weight']) for a, b in zip(netG_train_output2_crop, netG_train_input2_crop)])) * FLAGS['loss_source_data_term_weight']
+            train_data_term_2 = -tf.reduce_mean(input_tensor=tf.stack([img_L2_loss(a, b, FLAGS['loss_data_term_use_local_weight']) for a, b in zip(netG_train_output2_crop, netG_train_input2_crop)])) * FLAGS['loss_source_data_term_weight']
             test_data_term_2  = -img_L2_loss(netG_test_output2_crop, netG_test_input2_crop, FLAGS['loss_data_term_use_local_weight']) * FLAGS['loss_source_data_term_weight']
         elif FLAGS['loss_source_data_term'] == 'l1':
             assert False, 'not yet'
-            train_data_term_1 = -tf.reduce_mean(tf.pack([img_L1_loss(a, b) for a, b in zip(netG_train_output1_crop, netG_train_input1_crop)])) * FLAGS['loss_source_data_term_weight']
+            train_data_term_1 = -tf.reduce_mean(input_tensor=tf.stack([img_L1_loss(a, b) for a, b in zip(netG_train_output1_crop, netG_train_input1_crop)])) * FLAGS['loss_source_data_term_weight']
             test_data_term_1  = -img_L1_loss(netG_test_output1_crop, netG_test_input1_crop) * FLAGS['loss_source_data_term_weight']
-            train_data_term_2 = -tf.reduce_mean(tf.pack([img_L1_loss(a, b) for a, b in zip(netG_train_output2_crop, netG_train_input2_crop)])) * FLAGS['loss_source_data_term_weight']
+            train_data_term_2 = -tf.reduce_mean(input_tensor=tf.stack([img_L1_loss(a, b) for a, b in zip(netG_train_output2_crop, netG_train_input2_crop)])) * FLAGS['loss_source_data_term_weight']
             test_data_term_2  = -img_L1_loss(netG_test_output2_crop, netG_test_input2_crop) * FLAGS['loss_source_data_term_weight']
         elif FLAGS['loss_source_data_term'] == 'PR':
             assert False, 'not yet'
-            train_data_term_1 =  tf.pack([tf_photorealism_loss(netG_train_output1, train_df.mat1, i, FLAGS['loss_photorealism_is_our']) for i in range(FLAGS['data_train_batch_size'])])
-            train_data_term_1 = -tf.reduce_mean(train_data_term_1) * FLAGS['loss_source_data_term_weight']
-            test_data_term_1  =  tf.pack([tf_photorealism_loss(netG_test_output1,  test_df.mat1,  0, FLAGS['loss_photorealism_is_our'])])
-            test_data_term_1  = -tf.reduce_mean(test_data_term_1)  * FLAGS['loss_source_data_term_weight']
+            train_data_term_1 =  tf.stack([tf_photorealism_loss(netG_train_output1, train_df.mat1, i, FLAGS['loss_photorealism_is_our']) for i in range(FLAGS['data_train_batch_size'])])
+            train_data_term_1 = -tf.reduce_mean(input_tensor=train_data_term_1) * FLAGS['loss_source_data_term_weight']
+            test_data_term_1  =  tf.stack([tf_photorealism_loss(netG_test_output1,  test_df.mat1,  0, FLAGS['loss_photorealism_is_our'])])
+            test_data_term_1  = -tf.reduce_mean(input_tensor=test_data_term_1)  * FLAGS['loss_source_data_term_weight']
         else:
             assert False, 'data term error = %s' % FLAGS['loss_source_data_term']
     else:
@@ -159,21 +161,21 @@ with tf.name_scope("Loss"):
         netG_train_output2_inv_crop = [tf_crop_rect(netG_train_output2_inv, train_df.mat2, i) for i in range(FLAGS['data_train_batch_size'])]
         netG_test_output2_inv_crop  =  tf_crop_rect(netG_test_output2_inv,  test_df.mat2,  0)
         if FLAGS['loss_constant_term'] == 'l2':
-            train_constant_term_1 = -tf.reduce_mean(tf.pack([img_L2_loss(a, b, FLAGS['loss_constant_term_use_local_weight']) for a, b in zip(netG_train_output1_inv_crop, netG_train_input1_crop)])) * FLAGS['loss_constant_term_weight']
+            train_constant_term_1 = -tf.reduce_mean(input_tensor=tf.stack([img_L2_loss(a, b, FLAGS['loss_constant_term_use_local_weight']) for a, b in zip(netG_train_output1_inv_crop, netG_train_input1_crop)])) * FLAGS['loss_constant_term_weight']
             test_constant_term_1  = -img_L2_loss(netG_test_output1_inv_crop, netG_test_input1_crop, FLAGS['loss_constant_term_use_local_weight']) * FLAGS['loss_constant_term_weight']
-            train_constant_term_2 = -tf.reduce_mean(tf.pack([img_L2_loss(a, b, FLAGS['loss_constant_term_use_local_weight']) for a, b in zip(netG_train_output2_inv_crop, netG_train_input2_crop)])) * FLAGS['loss_constant_term_weight']
+            train_constant_term_2 = -tf.reduce_mean(input_tensor=tf.stack([img_L2_loss(a, b, FLAGS['loss_constant_term_use_local_weight']) for a, b in zip(netG_train_output2_inv_crop, netG_train_input2_crop)])) * FLAGS['loss_constant_term_weight']
             test_constant_term_2  = -img_L2_loss(netG_test_output2_inv_crop, netG_test_input2_crop, FLAGS['loss_constant_term_use_local_weight']) * FLAGS['loss_constant_term_weight']
         elif FLAGS['loss_constant_term'] == 'l1':
-            train_constant_term_1 = -tf.reduce_mean(tf.pack([img_L1_loss(a, b) for a, b in zip(netG_train_output1_inv_crop, netG_train_input1_crop)])) * FLAGS['loss_constant_term_weight']
+            train_constant_term_1 = -tf.reduce_mean(input_tensor=tf.stack([img_L1_loss(a, b) for a, b in zip(netG_train_output1_inv_crop, netG_train_input1_crop)])) * FLAGS['loss_constant_term_weight']
             test_constant_term_1  = -img_L1_loss(netG_test_output1_inv_crop, netG_test_input1_crop) * FLAGS['loss_constant_term_weight']
-            train_constant_term_2 = -tf.reduce_mean(tf.pack([img_L1_loss(a, b) for a, b in zip(netG_train_output2_inv_crop, netG_train_input2_crop)])) * FLAGS['loss_constant_term_weight']
+            train_constant_term_2 = -tf.reduce_mean(input_tensor=tf.stack([img_L1_loss(a, b) for a, b in zip(netG_train_output2_inv_crop, netG_train_input2_crop)])) * FLAGS['loss_constant_term_weight']
             test_constant_term_2  = -img_L1_loss(netG_test_output2_inv_crop, netG_test_input2_crop) * FLAGS['loss_constant_term_weight']
         elif FLAGS['loss_constant_term'] == 'PR':
             assert False, 'not yet'
-            train_constant_term_1 =  tf.pack([tf_photorealism_loss(netG_train_output1_inv, train_df.mat1, i, FLAGS['loss_photorealism_is_our']) for i in range(FLAGS['data_train_batch_size'])])
-            train_constant_term_1 = -tf.reduce_mean(train_constant_term_1) * FLAGS['loss_constant_term_weight']
-            test_constant_term_1  =  tf.pack([tf_photorealism_loss(netG_test_output1_inv,  test_df.mat1,  0, FLAGS['loss_photorealism_is_our'])])
-            test_constant_term_1  = -tf.reduce_mean(test_constant_term_1)  * FLAGS['loss_constant_term_weight']
+            train_constant_term_1 =  tf.stack([tf_photorealism_loss(netG_train_output1_inv, train_df.mat1, i, FLAGS['loss_photorealism_is_our']) for i in range(FLAGS['data_train_batch_size'])])
+            train_constant_term_1 = -tf.reduce_mean(input_tensor=train_constant_term_1) * FLAGS['loss_constant_term_weight']
+            test_constant_term_1  =  tf.stack([tf_photorealism_loss(netG_test_output1_inv,  test_df.mat1,  0, FLAGS['loss_photorealism_is_our'])])
+            test_constant_term_1  = -tf.reduce_mean(input_tensor=test_constant_term_1)  * FLAGS['loss_constant_term_weight']
         else:
             assert False, 'constant data term error = %s' % FLAGS['loss_constant_term']
 
@@ -183,32 +185,32 @@ with tf.name_scope("Loss"):
         train_constant_term_2 = tf.constant(0, dtype=FLAGS['data_compute_dtype'])
         test_constant_term_2 = tf.constant(0, dtype=FLAGS['data_compute_dtype'])
 
-    netD_train_loss = (-tf.reduce_mean(netD_train_output1_1) + tf.reduce_mean(netD_train_output2_1)) + (-tf.reduce_mean(netD_train_output1_2) + tf.reduce_mean(netD_train_output2_2))
-    netD_test_loss  = (-tf.reduce_mean(netD_test_output1_1)  + tf.reduce_mean(netD_test_output2_1))  + (-tf.reduce_mean(netD_test_output1_2)  + tf.reduce_mean(netD_test_output2_2))
+    netD_train_loss = (-tf.reduce_mean(input_tensor=netD_train_output1_1) + tf.reduce_mean(input_tensor=netD_train_output2_1)) + (-tf.reduce_mean(input_tensor=netD_train_output1_2) + tf.reduce_mean(input_tensor=netD_train_output2_2))
+    netD_test_loss  = (-tf.reduce_mean(input_tensor=netD_test_output1_1)  + tf.reduce_mean(input_tensor=netD_test_output2_1))  + (-tf.reduce_mean(input_tensor=netD_test_output1_2)  + tf.reduce_mean(input_tensor=netD_test_output2_2))
 
     def netG_improve_loss(be, af):
         l = af - be
-        l = tf.reduce_mean(tf.sign(l) * tf.square(l))
+        l = tf.reduce_mean(input_tensor=tf.sign(l) * tf.square(l))
         return tf.sign(l) * tf.sqrt(tf.abs(l))
 
-    netG_train_loss = tf.reduce_mean(netD_netG_train_output1_1) - tf.reduce_mean(netD_netG_train_output2_2)
-    netG_test_loss  = tf.reduce_mean(netD_test_output1_1)       - tf.reduce_mean(netD_test_output2_2)
+    netG_train_loss = tf.reduce_mean(input_tensor=netD_netG_train_output1_1) - tf.reduce_mean(input_tensor=netD_netG_train_output2_2)
+    netG_test_loss  = tf.reduce_mean(input_tensor=netD_test_output1_1)       - tf.reduce_mean(input_tensor=netD_test_output2_2)
     netG_batch_list_train_loss = netD_netG_train_output1_1 - netD_netG_train_output2_2
 
-    netG_train_1_1 = tf.reduce_mean(netD_netG_train_output1_1)
-    netG_train_2_1 = tf.reduce_mean(netD_netG_train_output2_1)
-    netG_train_1_2 = tf.reduce_mean(netD_netG_train_output1_2)
-    netG_train_2_2 = tf.reduce_mean(netD_netG_train_output2_2)
+    netG_train_1_1 = tf.reduce_mean(input_tensor=netD_netG_train_output1_1)
+    netG_train_2_1 = tf.reduce_mean(input_tensor=netD_netG_train_output2_1)
+    netG_train_1_2 = tf.reduce_mean(input_tensor=netD_netG_train_output1_2)
+    netG_train_2_2 = tf.reduce_mean(input_tensor=netD_netG_train_output2_2)
 
-    netD_train_1_1 = tf.reduce_mean(netD_train_output1_1)
-    netD_train_2_1 = tf.reduce_mean(netD_train_output2_1)
-    netD_train_1_2 = tf.reduce_mean(netD_train_output1_2)
-    netD_train_2_2 = tf.reduce_mean(netD_train_output2_2)
+    netD_train_1_1 = tf.reduce_mean(input_tensor=netD_train_output1_1)
+    netD_train_2_1 = tf.reduce_mean(input_tensor=netD_train_output2_1)
+    netD_train_1_2 = tf.reduce_mean(input_tensor=netD_train_output1_2)
+    netD_train_2_2 = tf.reduce_mean(input_tensor=netD_train_output2_2)
 
-    netG_test_1_1   = tf.reduce_mean(netD_test_output1_1)
-    netG_test_2_1   = tf.reduce_mean(netD_test_output2_1)
-    netG_test_1_2   = tf.reduce_mean(netD_test_output1_2)
-    netG_test_2_2   = tf.reduce_mean(netD_test_output2_2)
+    netG_test_1_1   = tf.reduce_mean(input_tensor=netD_test_output1_1)
+    netG_test_2_1   = tf.reduce_mean(input_tensor=netD_test_output2_1)
+    netG_test_1_2   = tf.reduce_mean(input_tensor=netD_test_output1_2)
+    netG_test_2_2   = tf.reduce_mean(input_tensor=netD_test_output2_2)
 
     netG_loss = netG_train_loss + train_data_term_1 + train_data_term_2 + train_constant_term_1 + train_constant_term_2
     netD_loss = netD_train_loss + gradient_penalty_1 + gradient_penalty_2
@@ -216,34 +218,34 @@ with tf.name_scope("Loss"):
 netG_total_loss = -netG_loss + netG_w_regularization_loss
 netD_total_loss = -netD_loss + netD_w_regularization_loss
 
-with tf.name_scope("netG_SGD"):
+with tf.compat.v1.name_scope("netG_SGD"):
     netG_optimizer = netG.OPTIMIZER
-    netG_gvs = netG_optimizer.compute_gradients(netG_total_loss, tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope=netG.variable_scope_name))
+    netG_gvs = netG_optimizer.compute_gradients(netG_total_loss, tf.compat.v1.get_collection(tf.compat.v1.GraphKeys.TRAINABLE_VARIABLES, scope=netG.variable_scope_name))
     netG_gbc = [grad for grad, var in netG_gvs]
     netG_capped_gvs = [(tf.clip_by_value(grad, -netG.GLOBAL_GRADIENT_CLIPPING, netG.GLOBAL_GRADIENT_CLIPPING), var) for grad, var in netG_gvs]
     netG_gac = [grad for grad, var in netG_capped_gvs]
     netG_opt = netG_optimizer.apply_gradients(netG_capped_gvs)
 
-    netG_gbc = tf.reduce_mean(tf.pack([tf.reduce_mean(tf.abs(v)) for v in netG_gbc]))
-    netG_gac = tf.reduce_mean(tf.pack([tf.reduce_mean(tf.abs(v)) for v in netG_gac]))
+    netG_gbc = tf.reduce_mean(input_tensor=tf.stack([tf.reduce_mean(input_tensor=tf.abs(v)) for v in netG_gbc]))
+    netG_gac = tf.reduce_mean(input_tensor=tf.stack([tf.reduce_mean(input_tensor=tf.abs(v)) for v in netG_gac]))
 
-with tf.name_scope("netD_SGD"):
+with tf.compat.v1.name_scope("netD_SGD"):
     netD_optimizer = netD.OPTIMIZER
-    netD_gvs = netD_optimizer.compute_gradients(netD_total_loss, tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope=netD.variable_scope_name))
+    netD_gvs = netD_optimizer.compute_gradients(netD_total_loss, tf.compat.v1.get_collection(tf.compat.v1.GraphKeys.TRAINABLE_VARIABLES, scope=netD.variable_scope_name))
     netD_gbc = [grad for grad, var in netD_gvs]
     netD_capped_gvs = [(tf.clip_by_value(grad, -netD.GLOBAL_GRADIENT_CLIPPING, netD.GLOBAL_GRADIENT_CLIPPING), var) for grad, var in netD_gvs]
     netD_gac = [grad for grad, var in netD_capped_gvs]
     netD_opt = netD_optimizer.apply_gradients(netD_capped_gvs)
 
-    netD_gbc = tf.reduce_mean(tf.pack([tf.reduce_mean(tf.abs(v)) for v in netD_gbc]))
-    netD_gac = tf.reduce_mean(tf.pack([tf.reduce_mean(tf.abs(v)) for v in netD_gac]))
+    netD_gbc = tf.reduce_mean(input_tensor=tf.stack([tf.reduce_mean(input_tensor=tf.abs(v)) for v in netD_gbc]))
+    netD_gac = tf.reduce_mean(input_tensor=tf.stack([tf.reduce_mean(input_tensor=tf.abs(v)) for v in netD_gac]))
 
 netG_train_output1_crop_round       = [tf.cast(tf.round(tf.clip_by_value(netG_train_output1_crop[i],      0, 1) * train_df.input1_label_src.dtype.max), tf.as_dtype(FLAGS['data_label_dtype'])) for i in range(FLAGS['data_train_batch_size'])]
 netG_train_input1_label_crop_round  = [tf.cast(tf.round(tf.clip_by_value(netG_train_input1_label_crop[i], 0, 1) * train_df.input1_label_src.dtype.max), tf.as_dtype(FLAGS['data_label_dtype'])) for i in range(FLAGS['data_train_batch_size'])]
-netG_tr_psnr1 = tf.reduce_mean(tf.pack([tf_psnr(netG_train_output1_crop_round[i], netG_train_input1_label_crop_round[i], 0) for i in range(FLAGS['data_train_batch_size'])]))
+netG_tr_psnr1 = tf.reduce_mean(input_tensor=tf.stack([tf_psnr(netG_train_output1_crop_round[i], netG_train_input1_label_crop_round[i], 0) for i in range(FLAGS['data_train_batch_size'])]))
 netG_train_output2_crop_round       = [tf.cast(tf.round(tf.clip_by_value(netG_train_output2_crop[i],      0, 1) * train_df.input2_label_src.dtype.max), tf.as_dtype(FLAGS['data_input_dtype'])) for i in range(FLAGS['data_train_batch_size'])]
 netG_train_input2_label_crop_round  = [tf.cast(tf.round(tf.clip_by_value(netG_train_input2_label_crop[i], 0, 1) * train_df.input2_label_src.dtype.max), tf.as_dtype(FLAGS['data_input_dtype'])) for i in range(FLAGS['data_train_batch_size'])]
-netG_tr_psnr2 = tf.reduce_mean(tf.pack([tf_psnr(netG_train_output2_crop_round[i], netG_train_input2_label_crop_round[i], 0) for i in range(FLAGS['data_train_batch_size'])]))
+netG_tr_psnr2 = tf.reduce_mean(input_tensor=tf.stack([tf_psnr(netG_train_output2_crop_round[i], netG_train_input2_label_crop_round[i], 0) for i in range(FLAGS['data_train_batch_size'])]))
 netG_tr_psnr2 = tf.constant(0, dtype=FLAGS['data_compute_dtype'])
 
 netG_test_output1_crop_round = tf.cast(tf.round(tf.clip_by_value(netG_test_output1_crop, 0, 1) * test_df.input2_src.dtype.max), tf.as_dtype(FLAGS['data_label_dtype']))
@@ -274,11 +276,11 @@ test_summary_placeholders = []
 train_summary_list = []
 test_summary_list = []
 for name in train_summary_names:
-    train_summary_placeholders.append(tf.placeholder(tf.as_dtype(FLAGS['data_compute_dtype'])))
-    train_summary_list.append(tf.summary.scalar(name, train_summary_placeholders[-1]))
+    train_summary_placeholders.append(tf.compat.v1.placeholder(tf.as_dtype(FLAGS['data_compute_dtype'])))
+    train_summary_list.append(tf.compat.v1.summary.scalar(name, train_summary_placeholders[-1]))
 for name in test_summary_names:
-    test_summary_placeholders.append(tf.placeholder(tf.as_dtype(FLAGS['data_compute_dtype'])))
-    test_summary_list.append(tf.summary.scalar(name, test_summary_placeholders[-1]))
+    test_summary_placeholders.append(tf.compat.v1.placeholder(tf.as_dtype(FLAGS['data_compute_dtype'])))
+    test_summary_list.append(tf.compat.v1.summary.scalar(name, test_summary_placeholders[-1]))
 
 def update_cache_dict(csr_ind, csr_val, csr_ind_r, csr_val_r, csr_ind_g, csr_val_g, csr_ind_b, csr_val_b, csr_names):
     for i, names in enumerate(csr_names):
@@ -420,16 +422,17 @@ def do_training_log(sess, train_summary_datas, now_epoch, train_avg, data_run_ti
 
     return timer.zero_time(), timer.zero_time(), train_summary_datas
 
-sess_config = tf.ConfigProto(log_device_placement=False)                                                                                                                                               
+sess_config = tf.compat.v1.ConfigProto(log_device_placement=False)                                                                                                                                               
 sess_config.gpu_options.allow_growth = (FLAGS['sys_use_all_gpu_memory'] == False)                                                                                                                 
 
 if __name__ == '__main__':
-    with tf.Session(config=sess_config) as sess:
-        tf.global_variables_initializer().run()
-        tf.local_variables_initializer().run()
-        summary_writer = tf.summary.FileWriter(FLAGS['folder_log'], sess.graph)
+    
+    with tf.compat.v1.Session(config=sess_config) as sess:
+        tf.compat.v1.global_variables_initializer().run()
+        tf.compat.v1.local_variables_initializer().run()
+        summary_writer = tf.compat.v1.summary.FileWriter(FLAGS['folder_log'], sess.graph)
         coord = tf.train.Coordinator()
-        threads = tf.train.start_queue_runners(sess=sess, coord=coord)
+        threads = tf.compat.v1.train.start_queue_runners(sess=sess, coord=coord)
         timer = Timer()
         data_run_time = timer.zero_time()
         sess_run_time = timer.zero_time()

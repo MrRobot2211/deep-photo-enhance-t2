@@ -246,7 +246,7 @@ def tf_normlize_to_one_score(scores):
     score_weight = [1, 2, 3, 4, 5]
     for i, s in enumerate(score_weight):
         result.append(scores[:, i] * s)
-    result = tf.reduce_sum(tf.pack(result, -1), axis=1, keep_dims=True)
+    result = tf.reduce_sum(input_tensor=tf.pack(result, -1), axis=1, keepdims=True)
     return result
 
 def tf_accumulate(tensor):
@@ -263,13 +263,13 @@ def tf_emd(inputs, labels):
     inputs = tf_accumulate(inputs)
     labels = tf_accumulate(labels)
 
-    return tf.reduce_sum(tf.abs(inputs - labels), axis=1)
+    return tf.reduce_sum(input_tensor=tf.abs(inputs - labels), axis=1)
 
 def tf_var(scores):
     index = np.asarray([1.0, 2.0, 3.0, 4.0, 5.0], dtype=np.float32)
-    index_tensor = tf.convert_to_tensor(index)
+    index_tensor = tf.convert_to_tensor(value=index)
     mindex_tensor = tf_normlize_to_one_score(scores)
-    result = tf.reduce_sum(tf.square(index_tensor - mindex_tensor) * scores, axis=1)
+    result = tf.reduce_sum(input_tensor=tf.square(index_tensor - mindex_tensor) * scores, axis=1)
     return result
 
 def tf_crop_rect(img, df, i):
@@ -280,9 +280,9 @@ def tf_crop_rect(img, df, i):
 def tf_photorealism_loss(img, df, i, is_our):
     rec_t = df.rect[i]
     img_t = img[i, rec_t[0]:rec_t[1], rec_t[2]:rec_t[3], :]
-    img_t = tf.image.rot90(img_t, 4 - tf.floordiv(df.rot[i], 2))
-    img_t = tf.cond(tf.equal(tf.mod(df.rot[i], 2), 0), lambda: img_t, lambda: tf.image.flip_left_right(img_t))
-    img_t = tf.transpose(img_t, [1, 0, 2])
+    img_t = tf.image.rot90(img_t, 4 - tf.math.floordiv(df.rot[i], 2))
+    img_t = tf.cond(pred=tf.equal(tf.math.floormod(df.rot[i], 2), 0), true_fn=lambda: img_t, false_fn=lambda: tf.image.flip_left_right(img_t))
+    img_t = tf.transpose(a=img_t, perm=[1, 0, 2])
     img_r = tf.reshape(img_t, [-1, 3])
     h = rec_t[1] - rec_t[0]
     w = rec_t[3] - rec_t[2]
@@ -295,17 +295,17 @@ def tf_photorealism_loss(img, df, i, is_our):
         mat_t_g = df.csr_mat_g[i]
         mat_t_b = df.csr_mat_b[i]
         img_r_b, img_r_g, img_r_r = tf.split(1, 3, img_r)
-        d_mat_r = tf.sparse_tensor_dense_matmul(mat_t_r, img_r_r)
-        d_mat_g = tf.sparse_tensor_dense_matmul(mat_t_g, img_r_g)
-        d_mat_b = tf.sparse_tensor_dense_matmul(mat_t_b, img_r_b)
-        result_r = tf.reduce_sum(img_r_r * d_mat_r)
-        result_g = tf.reduce_sum(img_r_g * d_mat_g)
-        result_b = tf.reduce_sum(img_r_b * d_mat_b)
-        result = tf.reduce_mean(tf.pack([result_r, result_b, result_g])) / k
+        d_mat_r = tf.sparse.sparse_dense_matmul(mat_t_r, img_r_r)
+        d_mat_g = tf.sparse.sparse_dense_matmul(mat_t_g, img_r_g)
+        d_mat_b = tf.sparse.sparse_dense_matmul(mat_t_b, img_r_b)
+        result_r = tf.reduce_sum(input_tensor=img_r_r * d_mat_r)
+        result_g = tf.reduce_sum(input_tensor=img_r_g * d_mat_g)
+        result_b = tf.reduce_sum(input_tensor=img_r_b * d_mat_b)
+        result = tf.reduce_mean(input_tensor=tf.pack([result_r, result_b, result_g])) / k
     else:
         mat_t = df.csr_mat[i]
-        d_mat = tf.sparse_tensor_dense_matmul(mat_t, img_r)
-        result = tf.reduce_sum(img_r * d_mat) / (k * 3)
+        d_mat = tf.sparse.sparse_dense_matmul(mat_t, img_r)
+        result = tf.reduce_sum(input_tensor=img_r * d_mat) / (k * 3)
     return result
 
 def tf_imgradient(tensor):
@@ -315,10 +315,10 @@ def tf_imgradient(tensor):
     #tensor = tensor * 255;
     sobel_x = tf.constant([[1, 0, -1], [2, 0, -2], [1, 0, -1]], tf.float32)
     sobel_x_filter = tf.reshape(sobel_x, [3, 3, 1, 1])
-    sobel_y_filter = tf.transpose(sobel_x_filter, [1, 0, 2, 3])
+    sobel_y_filter = tf.transpose(a=sobel_x_filter, perm=[1, 0, 2, 3])
     #tensor = tf.pad(tensor, [[0, 0], [1, 1], [1, 1], [0, 0]], 'SYMMETRIC')
-    fx = tf.nn.conv2d(tensor, sobel_x_filter, strides=[1,1,1,1], padding='VALID')
-    fy = tf.nn.conv2d(tensor, sobel_y_filter, strides=[1,1,1,1], padding='VALID')
+    fx = tf.nn.conv2d(input=tensor, filters=sobel_x_filter, strides=[1,1,1,1], padding='VALID')
+    fy = tf.nn.conv2d(input=tensor, filters=sobel_y_filter, strides=[1,1,1,1], padding='VALID')
     g = tf.sqrt(tf.square(fx) + tf.square(fy))
     return g
 
@@ -336,8 +336,8 @@ def tf_imgaussfilt(tensor, sigma):
     fs = int(2 * np.ceil(2 * sigma) + 1)
     kern = tf.constant(matlab_style_gauss2D((fs, fs), sigma), tf.float32)
     kern = tf.reshape(kern, [fs, fs, 1, 1])
-    tensor = tf.pad(tensor, [[0, 0], [fs//2, fs//2], [fs//2, fs//2], [0, 0]], 'SYMMETRIC')
-    g = tf.nn.conv2d(tensor, kern, strides=[1,1,1,1], padding='VALID')
+    tensor = tf.pad(tensor=tensor, paddings=[[0, 0], [fs//2, fs//2], [fs//2, fs//2], [0, 0]], mode='SYMMETRIC')
+    g = tf.nn.conv2d(input=tensor, filters=kern, strides=[1,1,1,1], padding='VALID')
     return g
 
 def tf_clip_loss(img, ori, df, i):
@@ -346,11 +346,11 @@ def tf_clip_loss(img, ori, df, i):
     ori_t = ori[i, rec_t[0]:rec_t[1], rec_t[2]:rec_t[3], :]
     img_t = tf.image.rgb_to_grayscale(img_t)
     ori_t = tf.image.rgb_to_grayscale(ori_t)
-    img_o = tf.zeros(shape=tf.shape(img_t), dtype=img_t.dtype)
+    img_o = tf.zeros(shape=tf.shape(input=img_t), dtype=img_t.dtype)
     img_b = tf.select(img_t <  0, ori_t - img_t, img_o)
     img_b = tf.select(ori_t == 0,         img_o, img_b)
     img_f = img_b
-    return tf.reduce_sum(tf.square(img_f))
+    return tf.reduce_sum(input_tensor=tf.square(img_f))
 
 def tf_improving_loss(score_b, score_a, leak):
     diff = score_a - score_b
@@ -360,7 +360,7 @@ def tf_improving_loss(score_b, score_a, leak):
     f1 = 0.5 * (1 + leak)
     f2 = 0.5 * (1 - leak)
     loss = f1 * loss + f2 * abs(loss)
-    return tf.reduce_mean(loss)
+    return tf.reduce_mean(input_tensor=loss)
 
 def tf_comparison_loss(guess, label):
     shift = 0.2
@@ -370,17 +370,17 @@ def tf_comparison_loss(guess, label):
     return label * guess
 
 def tf_log10(x):
-  numerator = tf.log(x)
-  denominator = tf.log(tf.constant(10, dtype=numerator.dtype))
+  numerator = tf.math.log(x)
+  denominator = tf.math.log(tf.constant(10, dtype=numerator.dtype))
   return numerator / denominator
 
 def tf_log2(x):
-  numerator = tf.log(x)
-  denominator = tf.log(tf.constant(2, dtype=numerator.dtype))
+  numerator = tf.math.log(x)
+  denominator = tf.math.log(tf.constant(2, dtype=numerator.dtype))
   return numerator / denominator
 
 def tf_gaussian_noise_layer(input_layer, std):
-    noise = tf.random_normal(shape=tf.shape(input_layer), mean=0.0, stddev=std, dtype=tf.float32) 
+    noise = tf.random.normal(shape=tf.shape(input=input_layer), mean=0.0, stddev=std, dtype=tf.float32) 
     return input_layer + noise
 
 def tf_crop_to_patch(inputs, labels, patch_size, channel, seed):
@@ -390,7 +390,7 @@ def tf_crop_to_patch(inputs, labels, patch_size, channel, seed):
     for i in range(len(inputs_list)):
         crop_size = [patch_size, patch_size, channel * 2]
         concat_tensor = tf.concat(concat_dim=2, values=[inputs_list[i], labels_list[i]])
-        concat_tensor = tf.random_crop(concat_tensor, crop_size, seed=seed)
+        concat_tensor = tf.image.random_crop(concat_tensor, crop_size, seed=seed)
         split0, split1 = tf.split(2, 2, concat_tensor)
         inputs_list[i] = split0
         labels_list[i] = split1
@@ -407,11 +407,11 @@ def tf_random_crop_resize(inputs, labels, img_size, channel, scale, seed):
     assert(len(inputs_list) == len(labels_list))
     for i in range(len(inputs_list)):
         # noise_std = tf.random_uniform([ ], minval=0, maxval=0.01, dtype=tf.float32, seed=seed)
-        crop_size = tf.random_uniform([2], minval=minval, maxval=img_size, dtype=tf.int32, seed=seed)
+        crop_size = tf.random.uniform([2], minval=minval, maxval=img_size, dtype=tf.int32, seed=seed)
         crop_size = tf.concat(0, [crop_size, [channel * 2]])
         concat_tensor = tf.concat(concat_dim=2, values=[inputs_list[i], labels_list[i]])
-        concat_tensor = tf.random_crop(concat_tensor, crop_size, seed=seed)
-        concat_tensor = tf.image.resize_images(concat_tensor, [img_size, img_size], method=tf.image.ResizeMethod.BICUBIC)
+        concat_tensor = tf.image.random_crop(concat_tensor, crop_size, seed=seed)
+        concat_tensor = tf.image.resize(concat_tensor, [img_size, img_size], method=tf.image.ResizeMethod.BICUBIC)
         split0, split1 = tf.split(2, 2, concat_tensor)
         inputs_list[i] = split0 #gaussian_noise_layer(split0, noise_std)
         labels_list[i] = split1
@@ -419,10 +419,10 @@ def tf_random_crop_resize(inputs, labels, img_size, channel, scale, seed):
     return tf.pack(inputs_list), tf.pack(labels_list)
 
 def tf_rgb_to_lab(srgb):
-    with tf.name_scope("rgb_to_lab"):
+    with tf.compat.v1.name_scope("rgb_to_lab"):
         srgb_pixels = tf.reshape(srgb, [-1, 3])
 
-        with tf.name_scope("srgb_to_xyz"):
+        with tf.compat.v1.name_scope("srgb_to_xyz"):
             linear_mask = tf.cast(srgb_pixels <= 0.04045, dtype=tf.float32)
             exponential_mask = tf.cast(srgb_pixels > 0.04045, dtype=tf.float32)
             rgb_pixels = (srgb_pixels / 12.92 * linear_mask) + (((srgb_pixels + 0.055) / 1.055) ** 2.4) * exponential_mask
@@ -435,7 +435,7 @@ def tf_rgb_to_lab(srgb):
             xyz_pixels = tf.matmul(rgb_pixels, rgb_to_xyz)
 
         # https://en.wikipedia.org/wiki/Lab_color_space#CIELAB-CIEXYZ_conversions
-        with tf.name_scope("xyz_to_cielab"):
+        with tf.compat.v1.name_scope("xyz_to_cielab"):
             # convert to fx = f(X/Xn), fy = f(Y/Yn), fz = f(Z/Zn)
 
             # normalize for D65 white point
@@ -455,15 +455,15 @@ def tf_rgb_to_lab(srgb):
             ])
             lab_pixels = tf.matmul(fxfyfz_pixels, fxfyfz_to_lab) + tf.constant([-16.0, 0.0, 0.0])
 
-        return tf.reshape(lab_pixels, tf.shape(srgb))
+        return tf.reshape(lab_pixels, tf.shape(input=srgb))
 
 
 def tf_lab_to_rgb(lab):
-    with tf.name_scope("lab_to_rgb"):
+    with tf.compat.v1.name_scope("lab_to_rgb"):
         lab_pixels = tf.reshape(lab, [-1, 3])
 
         # https://en.wikipedia.org/wiki/Lab_color_space#CIELAB-CIEXYZ_conversions
-        with tf.name_scope("cielab_to_xyz"):
+        with tf.compat.v1.name_scope("cielab_to_xyz"):
             # convert to fxfyfz
             lab_to_fxfyfz = tf.constant([
                 #   fx      fy        fz
@@ -482,7 +482,7 @@ def tf_lab_to_rgb(lab):
             # denormalize for D65 white point
             xyz_pixels = tf.multiply(xyz_pixels, [0.950456, 1.0, 1.088754])
 
-        with tf.name_scope("xyz_to_srgb"):
+        with tf.compat.v1.name_scope("xyz_to_srgb"):
             xyz_to_rgb = tf.constant([
                 #     r           g          b
                 [ 3.2404542, -0.9692660,  0.0556434], # x
@@ -496,10 +496,10 @@ def tf_lab_to_rgb(lab):
             exponential_mask = tf.cast(rgb_pixels > 0.0031308, dtype=tf.float32)
             srgb_pixels = (rgb_pixels * 12.92 * linear_mask) + ((rgb_pixels ** (1/2.4) * 1.055) - 0.055) * exponential_mask
 
-        return tf.reshape(srgb_pixels, tf.shape(lab))
+        return tf.reshape(srgb_pixels, tf.shape(input=lab))
 
 def tf_preprocess_lab(lab):
-    with tf.name_scope("preprocess_lab"):
+    with tf.compat.v1.name_scope("preprocess_lab"):
         L_chan, a_chan, b_chan = tf.unstack(lab, axis=3)
         # L_chan: black and white with input range [0, 100]
         # a_chan/b_chan: color channels with input range ~[-110, 110], not exact
@@ -507,7 +507,7 @@ def tf_preprocess_lab(lab):
         return tf.stack([L_chan / 100, (a_chan + 110) / 220, (b_chan + 110) / 220], axis=3)
 
 def tf_deprocess_lab(lab):
-    with tf.name_scope("deprocess_lab"):
+    with tf.compat.v1.name_scope("deprocess_lab"):
         # this is axis=3 instead of axis=2 because we process individual images but deprocess batches
         L_chan, a_chan, b_chan = tf.unstack(lab, axis=3)
         return tf.stack([L_chan * 100, (a_chan * 220) - 110, (b_chan * 220) - 110], axis=3)

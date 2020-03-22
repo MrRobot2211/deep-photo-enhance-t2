@@ -20,8 +20,8 @@ def tf_psnr(input, label, shave):
         input = input[shave:-shave, shave:-shave, :]
         label = label[shave:-shave, shave:-shave, :]
     diff = tf.cast(label, tf.int32) - tf.cast(input, tf.int32)
-    mse = tf.reduce_mean(tf.cast(diff, tf.float32) ** 2.)
-    return tf.cond(tf.equal(mse, 0), lambda: tf.constant(1e6, dtype=mse.dtype), lambda: 20*np.log10(label.dtype.max)-10*tf_log10(mse))
+    mse = tf.reduce_mean(input_tensor=tf.cast(diff, tf.float32) ** 2.)
+    return tf.cond(pred=tf.equal(mse, 0), true_fn=lambda: tf.constant(1e6, dtype=mse.dtype), false_fn=lambda: 20*np.log10(label.dtype.max)-10*tf_log10(mse))
 
 def tf_psnr_float(input, label, shave, max_i, single_channel, is_circle, scale):
     assert (label.dtype == input.dtype)
@@ -59,7 +59,7 @@ def tf_psnr_float(input, label, shave, max_i, single_channel, is_circle, scale):
         mask_3 = tf.cast((mask_1 * h) > 0, tf.float32)
         diff = (h + (middle * mask_2) - (middle * mask_3)) * 2
 
-    mse = tf.reduce_mean(tf.square(diff)) * scale + 1e-10
+    mse = tf.reduce_mean(input_tensor=tf.square(diff)) * scale + 1e-10
     return 20*np.log10(max_i)-10*tf_log10(mse)
 
 def ssim(img1, img2, shave, cs_map=False, mean_metric=True, size=11, sigma=1.5):
@@ -108,13 +108,13 @@ def tf_fspecial_gauss(size, sigma):
     g = tf.exp(-((x*x + y*y)/(2.0*sigma*sigma)))
     g = tf.expand_dims(g, -1)
     g = tf.expand_dims(g, -1)
-    return g / tf.reduce_sum(g)
+    return g / tf.reduce_sum(input_tensor=g)
 
 
 def tf_ssim(img1, img2, shave, L, cs_map=False, mean_metric=True, size=11, sigma=1.5):
     assert(img1.dtype == img2.dtype)
-    img1 = tf.transpose(img1, [2, 0, 1])
-    img2 = tf.transpose(img2, [2, 0, 1])
+    img1 = tf.transpose(a=img1, perm=[2, 0, 1])
+    img2 = tf.transpose(a=img2, perm=[2, 0, 1])
     img1 = tf.expand_dims(img1, -1)
     img2 = tf.expand_dims(img2, -1)
     if shave != 0:
@@ -127,14 +127,14 @@ def tf_ssim(img1, img2, shave, L, cs_map=False, mean_metric=True, size=11, sigma
     C2 = (K2*L)**2
     img1 = tf.cast(img1, tf.float32)
     img2 = tf.cast(img2, tf.float32)
-    mu1 = tf.nn.conv2d(img1, window, strides=[1,1,1,1], padding='VALID')
-    mu2 = tf.nn.conv2d(img2, window, strides=[1,1,1,1], padding='VALID')
+    mu1 = tf.nn.conv2d(input=img1, filters=window, strides=[1,1,1,1], padding='VALID')
+    mu2 = tf.nn.conv2d(input=img2, filters=window, strides=[1,1,1,1], padding='VALID')
     mu1_sq  = mu1*mu1
     mu2_sq  = mu2*mu2
     mu1_mu2 = mu1*mu2
-    sigma1_sq = tf.nn.conv2d(img1*img1, window, strides=[1,1,1,1], padding='VALID') - mu1_sq
-    sigma2_sq = tf.nn.conv2d(img2*img2, window, strides=[1,1,1,1], padding='VALID') - mu2_sq
-    sigma12   = tf.nn.conv2d(img1*img2, window, strides=[1,1,1,1], padding='VALID') - mu1_mu2
+    sigma1_sq = tf.nn.conv2d(input=img1*img1, filters=window, strides=[1,1,1,1], padding='VALID') - mu1_sq
+    sigma2_sq = tf.nn.conv2d(input=img2*img2, filters=window, strides=[1,1,1,1], padding='VALID') - mu2_sq
+    sigma12   = tf.nn.conv2d(input=img1*img2, filters=window, strides=[1,1,1,1], padding='VALID') - mu1_mu2
     if cs_map:
         value = (((2*mu1_mu2 + C1)*(2*sigma12 + C2))/((mu1_sq + mu2_sq + C1)*(sigma1_sq + sigma2_sq + C2)),
                 (2.0*sigma12 + C2)/(sigma1_sq + sigma2_sq + C2))
@@ -142,5 +142,5 @@ def tf_ssim(img1, img2, shave, L, cs_map=False, mean_metric=True, size=11, sigma
         value =  ((2*mu1_mu2 + C1)*(2*sigma12 + C2))/((mu1_sq + mu2_sq + C1)*(sigma1_sq + sigma2_sq + C2))
 
     if mean_metric:
-        value = tf.reduce_mean(value)
+        value = tf.reduce_mean(input_tensor=value)
     return value

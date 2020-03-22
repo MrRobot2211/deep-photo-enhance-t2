@@ -6,6 +6,8 @@ from multiprocessing import Process, Queue, Manager
 from FUNCTION import *
 from CONVNET import *
 
+tf.compat.v1.disable_eager_execution()
+
 # Configure
 FLAGS = {}
 
@@ -70,8 +72,8 @@ FLAGS['format_log_value'] = '{:6.4f}'
 if FLAGS['sys_use_unix']:
     FLAGS['path_char'] = '/'
     if FLAGS['sys_is_dgx']:
-        FLAGS['path_data'] = '/dataset/LPGAN'
-        FLAGS['path_result_root'] = '/dataset/LPGAN-Result/%03d-DGX-LPGAN'
+        FLAGS['path_data'] = '../input/LPGAN'
+        FLAGS['path_result_root'] = '../input/LPGAN-Result/%03d-DGX-LPGAN'
     else:
         FLAGS['path_data'] = '/tmp3/nothinglo/dataset/LPGAN'
         FLAGS['path_result_root'] = '/tmp3/nothinglo/dataset/LPGAN-Result/%03d-DGX-LPGAN'
@@ -168,17 +170,17 @@ train_image_name_list_label = train_image_name_list_label[:FLAGS['data_train_sam
 
 class DataFlowMat(object):
     def __init__(self, b):
-        self.rect      = [tf.placeholder(tf.int32)                    for _ in range(b)]
-        self.rot       = [tf.placeholder(tf.int32)                    for _ in range(b)]
-        self.csr_ind   = [tf.placeholder(tf.int64)                    for _ in range(b)]
-        self.csr_val   = [tf.placeholder(FLAGS['data_compute_dtype']) for _ in range(b)]
-        self.csr_ind_r = [tf.placeholder(tf.int64)                    for _ in range(b)]
-        self.csr_val_r = [tf.placeholder(FLAGS['data_compute_dtype']) for _ in range(b)]
-        self.csr_ind_g = [tf.placeholder(tf.int64)                    for _ in range(b)]
-        self.csr_val_g = [tf.placeholder(FLAGS['data_compute_dtype']) for _ in range(b)]
-        self.csr_ind_b = [tf.placeholder(tf.int64)                    for _ in range(b)]
-        self.csr_val_b = [tf.placeholder(FLAGS['data_compute_dtype']) for _ in range(b)]
-        self.csr_sha   = [tf.placeholder(tf.int64)                    for _ in range(b)]
+        self.rect      = [tf.compat.v1.placeholder(tf.int32)                    for _ in range(b)]
+        self.rot       = [tf.compat.v1.placeholder(tf.int32)                    for _ in range(b)]
+        self.csr_ind   = [tf.compat.v1.placeholder(tf.int64)                    for _ in range(b)]
+        self.csr_val   = [tf.compat.v1.placeholder(FLAGS['data_compute_dtype']) for _ in range(b)]
+        self.csr_ind_r = [tf.compat.v1.placeholder(tf.int64)                    for _ in range(b)]
+        self.csr_val_r = [tf.compat.v1.placeholder(FLAGS['data_compute_dtype']) for _ in range(b)]
+        self.csr_ind_g = [tf.compat.v1.placeholder(tf.int64)                    for _ in range(b)]
+        self.csr_val_g = [tf.compat.v1.placeholder(FLAGS['data_compute_dtype']) for _ in range(b)]
+        self.csr_ind_b = [tf.compat.v1.placeholder(tf.int64)                    for _ in range(b)]
+        self.csr_val_b = [tf.compat.v1.placeholder(FLAGS['data_compute_dtype']) for _ in range(b)]
+        self.csr_sha   = [tf.compat.v1.placeholder(tf.int64)                    for _ in range(b)]
 
         self.csr_mat   = [tf.SparseTensor(ind, val, sha) for ind, val, sha in zip(self.csr_ind,   self.csr_val,   self.csr_sha)]
         self.csr_mat_r = [tf.SparseTensor(ind, val, sha) for ind, val, sha in zip(self.csr_ind_r, self.csr_val_r, self.csr_sha)]
@@ -190,15 +192,15 @@ class DataFlow(object):
             b = FLAGS['data_train_batch_size']
         else:
             b = 1
-        self.input1_src = tf.placeholder(tf.as_dtype(FLAGS['data_input_dtype']), shape=[b, FLAGS['data_image_size'], FLAGS['data_image_size'], FLAGS['data_image_channel']])
+        self.input1_src = tf.compat.v1.placeholder(tf.as_dtype(FLAGS['data_input_dtype']), shape=[b, FLAGS['data_image_size'], FLAGS['data_image_size'], FLAGS['data_image_channel']])
         self.input1 = tf.cast(self.input1_src, FLAGS['data_compute_dtype']) / self.input1_src.dtype.max
-        self.input2_src = tf.placeholder(tf.as_dtype(FLAGS['data_label_dtype']), shape=[b, FLAGS['data_image_size'], FLAGS['data_image_size'], FLAGS['data_image_channel']])
+        self.input2_src = tf.compat.v1.placeholder(tf.as_dtype(FLAGS['data_label_dtype']), shape=[b, FLAGS['data_image_size'], FLAGS['data_image_size'], FLAGS['data_image_channel']])
         self.input2 = tf.cast(self.input2_src, FLAGS['data_compute_dtype']) / self.input2_src.dtype.max
 
         if is_training:
-            self.input1_label_src = tf.placeholder(tf.as_dtype(FLAGS['data_label_dtype']), shape=[b, FLAGS['data_image_size'], FLAGS['data_image_size'], FLAGS['data_image_channel']])
+            self.input1_label_src = tf.compat.v1.placeholder(tf.as_dtype(FLAGS['data_label_dtype']), shape=[b, FLAGS['data_image_size'], FLAGS['data_image_size'], FLAGS['data_image_channel']])
             self.input1_label = tf.cast(self.input1_label_src, FLAGS['data_compute_dtype']) / self.input1_label_src.dtype.max
-            self.input2_label_src = tf.placeholder(tf.as_dtype(FLAGS['data_input_dtype']), shape=[b, FLAGS['data_image_size'], FLAGS['data_image_size'], FLAGS['data_image_channel']])
+            self.input2_label_src = tf.compat.v1.placeholder(tf.as_dtype(FLAGS['data_input_dtype']), shape=[b, FLAGS['data_image_size'], FLAGS['data_image_size'], FLAGS['data_image_channel']])
             self.input2_label = tf.cast(self.input2_label_src, FLAGS['data_compute_dtype']) / self.input2_label_src.dtype.max
 
         self.mat1 = DataFlowMat(b)
@@ -221,13 +223,13 @@ class NetInfo(object):
             init_w = FLAGS['netD_init_weight']
             rw = FLAGS['netD_regularization_weight']
             if FLAGS['netD_init_method'] == "var_scale":
-                initializer = tf.contrib.layers.variance_scaling_initializer(init_w, seed=seed)
+                initializer = tf.compat.v1.keras.initializers.VarianceScaling(init_w, seed=seed)
             elif FLAGS['netD_init_method'] == "rand_uniform":
-                initializer = tf.random_uniform_initializer(-init_w*np.sqrt(3), init_w*np.sqrt(3), seed=seed)
+                initializer = tf.compat.v1.random_uniform_initializer(-init_w*np.sqrt(3), init_w*np.sqrt(3), seed=seed)
             elif FLAGS['netD_init_method'] == "rand_normal":
-                initializer = tf.random_normal_initializer(mean=0., stddev=init_w, seed=seed)
+                initializer = tf.compat.v1.random_normal_initializer(mean=0., stddev=init_w, seed=seed)
             elif FLAGS['netD_init_method'] == "truncated_normal":
-                initializer = tf.truncated_normal_initializer(mean=0., stddev=init_w, seed=seed)
+                initializer = tf.compat.v1.truncated_normal_initializer(mean=0., stddev=init_w, seed=seed)
             nonlinearity = lrelu_layer(0.2) #prelu_layer()
             norm = in_layer(True, True)
             act = [nonlinearity, norm]
@@ -247,13 +249,13 @@ class NetInfo(object):
             init_w = FLAGS['netG_init_weight']
             rw = FLAGS['netG_regularization_weight']
             if FLAGS['netG_init_method'] == "var_scale":
-                initializer = tf.contrib.layers.variance_scaling_initializer(init_w, seed=seed)
+                initializer = tf.compat.v1.keras.initializers.VarianceScaling(init_w, seed=seed)
             elif FLAGS['netG_init_method'] == "rand_uniform":
-                initializer = tf.random_uniform_initializer(-init_w*np.sqrt(3), init_w*np.sqrt(3), seed=seed)
+                initializer = tf.compat.v1.random_uniform_initializer(-init_w*np.sqrt(3), init_w*np.sqrt(3), seed=seed)
             elif FLAGS['netG_init_method'] == "rand_normal":
-                initializer = tf.random_normal_initializer(mean=0., stddev=init_w, seed=seed)
+                initializer = tf.compat.v1.random_normal_initializer(mean=0., stddev=init_w, seed=seed)
             elif FLAGS['netG_init_method'] == "truncated_normal":
-                initializer = tf.truncated_normal_initializer(mean=0., stddev=init_w, seed=seed)
+                initializer = tf.compat.v1.truncated_normal_initializer(mean=0., stddev=init_w, seed=seed)
             nonlinearity = selu_layer() #prelu_layer()
             norm = bn_layer(True, True)
             act = [nonlinearity, norm]
@@ -298,8 +300,8 @@ class NetInfo(object):
         self.weights = []
         self.parameter_names = []
         self.REGULARIZATION_WEIGHT = rw
-        self.base_lr = tf.placeholder(tf.as_dtype(FLAGS['data_compute_dtype']))
-        self.OPTIMIZER = tf.train.AdamOptimizer(learning_rate=self.base_lr)
+        self.base_lr = tf.compat.v1.placeholder(tf.as_dtype(FLAGS['data_compute_dtype']))
+        self.OPTIMIZER = tf.compat.v1.train.AdamOptimizer(learning_rate=self.base_lr)
         self.GLOBAL_GRADIENT_CLIPPING = FLAGS['net_gradient_clip_value']
         self.name = name
         self.variable_scope_name = name + '_var_scope'

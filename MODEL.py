@@ -14,7 +14,7 @@ def conv_net_block(conv_net, net_info, tensor_list, is_first, is_training, act_o
         if FLAGS['mode_use_debug']:
             print(net_info.architecture_log[-2])
             print(net_info.architecture_log[-1])
-    with tf.variable_scope(conv_net['net_name']):
+    with tf.compat.v1.variable_scope(conv_net['net_name']):
         for l_index, layer_o in enumerate(conv_net['layers']):
             layer = layer_o['name']
             if layer == "relu":
@@ -101,19 +101,19 @@ def model(net_info, tensor, is_training, act_o, is_first=False):
 
 def img_L2_loss(img1, img2, use_local_weight):
     if use_local_weight:
-        w = -tf.log(tf.cast(img2, tf.float64) + tf.exp(tf.constant(-99, dtype=tf.float64))) + 1
+        w = -tf.math.log(tf.cast(img2, tf.float64) + tf.exp(tf.constant(-99, dtype=tf.float64))) + 1
         w = tf.cast(w * w, tf.float32)
-        return tf.reduce_mean(w * tf.square(tf.sub(img1, img2)))
+        return tf.reduce_mean(input_tensor=w * tf.square(tf.subtract(img1, img2)))
     else:
-        return tf.reduce_mean(tf.square(tf.sub(img1, img2)))
+        return tf.reduce_mean(input_tensor=tf.square(tf.subtract(img1, img2)))
 
 def img_L1_loss(img1, img2):
-    return tf.reduce_mean(tf.abs(tf.sub(img1, img2)))
+    return tf.reduce_mean(input_tensor=tf.abs(tf.subtract(img1, img2)))
 
 def img_GD_loss(img1, img2):
     img1 = tf_imgradient(tf.pack([img1]))
     img2 = tf_imgradient(tf.pack([img2]))
-    return tf.reduce_mean(tf.square(tf.sub(img1, img2)))
+    return tf.reduce_mean(input_tensor=tf.square(tf.subtract(img1, img2)))
 
 def regularization_cost(net_info):
     cost = 0
