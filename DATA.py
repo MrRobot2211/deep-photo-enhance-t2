@@ -7,14 +7,14 @@ from FUNCTION import *
 from CONVNET import *
 
 tf.compat.v1.disable_eager_execution()
-
+tf.compat.v1.disable_resource_variables()
 # Configure
 FLAGS = {}
 
 FLAGS['method'] = 'WGAN-v24-cycleganD2' 
 FLAGS['mode_use_debug'] = False
 FLAGS['num_exp'] = 736
-FLAGS['num_gpu'] = '4'
+FLAGS['num_gpu'] = '3'
 FLAGS['sys_use_unix'] = True
 FLAGS['sys_is_dgx'] = True
 
@@ -153,9 +153,10 @@ random.seed(FLAGS['process_random_seed'])
 test_image_name_list = read_file_to_list(FLAGS['txt_test'],  str, False)
 train_image_name_list_input = tmp_train_image_name_list_input = read_file_to_list(FLAGS['txt_train_input'], str, False)
 train_image_name_list_label = read_file_to_list(FLAGS['txt_train_label'], str, False)
-train_image_name_list_label_HDR_627 = ["hdr_627_%03d" % (i+1) for i in range(627)]
-
-train_image_name_list_label = train_image_name_list_label_HDR_627
+#train_image_name_list_label_HDR_627 = ["hdr_627_%03d" % (i+1) for i in range(627)]
+train_image_name_list_label_HDR_627=[]
+#this ooks weird it is steping on train_image_name_list_label
+train_image_name_list_label += train_image_name_list_label + train_image_name_list_label_HDR_627
 
 FLAGS['data_test_image_count']  = len(test_image_name_list)
 FLAGS['data_train_image_count_input'] = len(train_image_name_list_input)
@@ -314,7 +315,9 @@ test_df = DataFlow(False)
 def prepare_csr_dict(csr_dict, read_data):
     keys = []
     if FLAGS['loss_pr']:
-        test_count = FLAGS['data_test_image_count'] if FLAGS['process_write_test_img_count'] == 0 or FLAGS['process_train_data_loader_count'] <= 0 else FLAGS['process_write_test_img_count']
+        #this is tempoal coment
+        #test_count = FLAGS['data_test_image_count'] if FLAGS['process_write_test_img_count'] == 0 or FLAGS['process_train_data_loader_count'] <= 0 else FLAGS['process_write_test_img_count']
+        test_count = FLAGS['data_test_image_count']
         total_name_list = tmp_train_image_name_list_input + test_image_name_list[:test_count]
         d_i = 3 if FLAGS['loss_photorealism_is_our'] else 1
         end_i = min(len(total_name_list), FLAGS['data_csr_buffer_size'] // d_i)
@@ -402,12 +405,22 @@ class DataLoader(object):
             self.train_data_load_process_list.append(data_load_process)
     def enqueue_test_batch(self, input_queue, label_queue):
         while True:
-            test_count = FLAGS['data_test_image_count'] if FLAGS['process_write_test_img_count'] == 0 or FLAGS['process_train_data_loader_count'] <= 0 else FLAGS['process_write_test_img_count']
-
+            #temporaly removed
+            #test_count = FLAGS['data_test_image_count'] if FLAGS['process_write_test_img_count'] == 0 or FLAGS['process_train_data_loader_count'] <= 0 else FLAGS['process_write_test_img_count']
+            test_count = FLAGS['data_test_image_count']
             for i in range(test_count):
                 file_name = test_image_name_list[i]
                 input_img = cv2.imread(FLAGS['folder_input'] + file_name + FLAGS['data_input_ext'], -1)
                 label_img = cv2.imread(FLAGS['folder_label'] + file_name + FLAGS['data_input_ext'], -1)
+                
+                
+                print(file_name)
+
+                print(input_img.shape)
+                print(label_img.shape)
+
+
+
                 pix_c = input_img.shape[0] * input_img.shape[1]
                 rot = 0
                 input_img, _, rect = random_pad_to_size(input_img, FLAGS['data_image_size'], None, True, False)
@@ -466,6 +479,10 @@ class DataLoader(object):
 
             input_label_img = cv2.imread(FLAGS['folder_label'] + file_name_input + FLAGS['data_input_ext'], -1)
             #label_input_img = cv2.imread(FLAGS['folder_input'] + file_name_label + FLAGS['data_input_ext'], -1)
+            print(FLAGS['folder_input'] + file_name_input + FLAGS['data_input_ext'])
+            print(input_img.shape)
+            print(FLAGS['folder_label'] + file_name_label + FLAGS['data_input_ext'])
+            print(label_img.shape)
             pix_c1 = input_img.shape[0] * input_img.shape[1]
             pix_c2 = label_img.shape[0] * label_img.shape[1]
 
@@ -491,6 +508,7 @@ class DataLoader(object):
                 input_img, label_img, input_label_img = get_patch(train_image_name_list_input[i], train_image_name_list_label[j])
                 rot1 = i % FLAGS['data_augmentation_size']
                 rot2 = j % FLAGS['data_augmentation_size']
+                
                 input_img, _, rect1 = data_augmentation(input_img, rot1, FLAGS['data_augmentation_size'], FLAGS['data_image_size'], True, FLAGS['data_use_random_pad'])
                 label_img, _, rect2 = data_augmentation(label_img, rot2, FLAGS['data_augmentation_size'], FLAGS['data_image_size'], True, FLAGS['data_use_random_pad'])
                 input_label_img, _, _ = data_augmentation(input_label_img, rot1, FLAGS['data_augmentation_size'], FLAGS['data_image_size'], True, FLAGS['data_use_random_pad'])

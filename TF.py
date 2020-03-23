@@ -7,7 +7,8 @@ from FUNCTION import *
 from EVALUATION import *
 
 tf.compat.v1.disable_eager_execution()
-tf.compat.v1.disable_resource_variables()
+print(tf.config.list_physical_devices('GPU'))
+#tf.compat.v1.disable_resource_variables()
 os.environ["CUDA_VISIBLE_DEVICES"] = FLAGS['num_gpu']
 sys.stdout = Tee(sys.stdout, open(FLAGS['txt_log'], 'a+'))
 
@@ -302,8 +303,9 @@ def do_testing(now_epoch, data_loader, best_value_history, indices_1, indices_2,
     timer = Timer()
     timer.start()
     test_avg = [0] * len(netG_test_summary_names)
-    test_count = FLAGS['data_test_image_count'] if FLAGS['process_write_test_img_count'] == 0 or is_training == False else FLAGS['process_write_test_img_count']
-
+    #temporaly removed
+    #test_count = FLAGS['data_test_image_count'] if FLAGS['process_write_test_img_count'] == 0 or is_training == False else FLAGS['process_write_test_img_count']
+    test_count = FLAGS['data_test_image_count']
     test_loss_list = np.zeros((len(netG_test_summary_names), test_count))
     for i in range(test_count):
         timer2 = Timer()
