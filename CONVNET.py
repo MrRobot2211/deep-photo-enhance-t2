@@ -144,6 +144,7 @@ def exe_bn_layer(tensor, layer_o, net_info, l_index, is_first, is_training, trai
 #  ...##....##..##.
 #  .######..##..##.
 #  ................
+#individual layer norm
 def in_layer(use_offset=False, use_scale=False, epsilon=1e-5):
     return dict(
         name='in',
