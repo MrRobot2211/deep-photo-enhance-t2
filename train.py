@@ -6,6 +6,10 @@ from MODEL import *
 from FUNCTION import *
 from EVALUATION import *
 
+
+FLAGS['path_result_root'] = model_dir+'/%03d-DGX-LPGAN'
+FLAGS['process_max_epoch'] = epochs
+
 tf.compat.v1.disable_eager_execution()
 print(tf.config.list_physical_devices('GPU'))
 #tf.compat.v1.disable_resource_variables()

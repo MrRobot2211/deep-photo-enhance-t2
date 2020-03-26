@@ -74,6 +74,7 @@ if FLAGS['sys_use_unix']:
     if FLAGS['sys_is_dgx']:
         FLAGS['path_data'] = '../input/LPGAN'
         FLAGS['path_result_root'] = '../input/LPGAN-Result/%03d-DGX-LPGAN'
+        #FLAGS['path_result_root'] = model_+'/%03d-DGX-LPGAN'
     else:
         FLAGS['path_data'] = '/tmp3/nothinglo/dataset/LPGAN'
         FLAGS['path_result_root'] = '/tmp3/nothinglo/dataset/LPGAN-Result/%03d-DGX-LPGAN'
@@ -203,7 +204,7 @@ class DataFlow(object):
             self.input1_label = tf.cast(self.input1_label_src, FLAGS['data_compute_dtype']) / self.input1_label_src.dtype.max
             self.input2_label_src = tf.compat.v1.placeholder(tf.as_dtype(FLAGS['data_input_dtype']), shape=[b, FLAGS['data_image_size'], FLAGS['data_image_size'], FLAGS['data_image_channel']])
             self.input2_label = tf.cast(self.input2_label_src, FLAGS['data_compute_dtype']) / self.input2_label_src.dtype.max
-
+        self.rate = tf.compat.v1.placeholder(tf.int32)
         self.mat1 = DataFlowMat(b)
         self.mat2 = DataFlowMat(b)
 
