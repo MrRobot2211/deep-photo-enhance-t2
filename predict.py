@@ -6,6 +6,36 @@ from MODEL import *
 from FUNCTION import *
 from PREPROCESSING import *
 
+
+
+
+def parse_args():
+    
+    parser = argparse.ArgumentParser()
+
+    # hyperparameters sent by the client are passed as command-line arguments to the script
+    parser.add_argument('--epochs', type=int, default=1)
+    parser.add_argument('--batch_size', type=int, default=64)
+    
+    parser.add_argument('--num_words', type=int)
+    parser.add_argument('--word_index_len', type=int)
+    parser.add_argument('--labels_index_len', type=int)
+    parser.add_argument('--embedding_dim', type=int)
+    parser.add_argument('--max_sequence_len', type=int)
+    
+    # data directories
+    parser.add_argument('--train', type=str, default=os.environ.get('SM_CHANNEL_TRAIN'))
+    parser.add_argument('--val', type=str, default=os.environ.get('SM_CHANNEL_VAL'))
+    
+    # embedding directory
+    parser.add_argument('--embedding', type=str, default=os.environ.get('SM_CHANNEL_EMBEDDING'))
+    
+    # model directory: we will use the default set by SageMaker, /opt/ml/model
+    parser.add_argument('--model_dir', type=str, default=os.environ.get('SM_MODEL_DIR'))
+    
+    return parser.parse_known_args()
+
+
 FLAGS['inference_folder'] = inference_folder
 
 tf.compat.v1.disable_eager_execution()

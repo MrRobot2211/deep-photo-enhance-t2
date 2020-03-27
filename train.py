@@ -7,8 +7,33 @@ from FUNCTION import *
 from EVALUATION import *
 
 
-FLAGS['path_result_root'] = model_dir+'/%03d-DGX-LPGAN'
-FLAGS['process_max_epoch'] = epochs
+def parse_args():
+    
+    parser = argparse.ArgumentParser()
+
+    # hyperparameters sent by the client are passed as command-line arguments to the script
+    parser.add_argument('--epochs', type=int, default=1)
+    parser.add_argument('--batch_size', type=int, default=64)
+    
+    parser.add_argument('--n_gpu', type=int)
+    parser.add_argument('--word_index_len', type=int)
+    parser.add_argument('--labels_index_len', type=int)
+    parser.add_argument('--embedding_dim', type=int)
+    parser.add_argument('--max_sequence_len', type=int)
+    
+    # data directories
+    parser.add_argument('--train', type=str, default=os.environ.get('SM_CHANNEL_TRAIN'))
+    parser.add_argument('--val', type=str, default=os.environ.get('SM_CHANNEL_VAL'))
+    
+    # embedding directory
+    parser.add_argument('--embedding', type=str, default=os.environ.get('SM_CHANNEL_EMBEDDING'))
+    
+    # model directory: we will use the default set by SageMaker, /opt/ml/model
+    parser.add_argument('--model_dir', type=str, default=os.environ.get('SM_MODEL_DIR'))
+    
+    return parser.parse_known_args()
+
+
 
 tf.compat.v1.disable_eager_execution()
 print(tf.config.list_physical_devices('GPU'))
@@ -431,8 +456,13 @@ def do_training_log(sess, train_summary_datas, now_epoch, train_avg, data_run_ti
 sess_config = tf.compat.v1.ConfigProto(log_device_placement=False)                                                                                                                                               
 sess_config.gpu_options.allow_growth = (FLAGS['sys_use_all_gpu_memory'] == False)                                                                                                                 
 
-if __name__ == '__main__':
-    
+if __name__ == '__main__': 
+    tf.config.list_physical_devices('GPU')   
+    args, _ = parse_args()
+    FLAGS['process_max_epoch'] = args.epochs
+    FLAGS['folder_model']= args.model_dir
+    FLAGS['gpu']= args.n_gpu
+
     with tf.compat.v1.Session(config=sess_config) as sess:
         tf.compat.v1.global_variables_initializer().run()
         tf.compat.v1.local_variables_initializer().run()
@@ -628,3 +658,12 @@ if __name__ == '__main__':
         coord.request_stop()
         coord.join(threads)
         sess.close()
+
+
+
+
+
+
+
+
+
