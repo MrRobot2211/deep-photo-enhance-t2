@@ -96,6 +96,10 @@ def model(net_info, tensor, is_training, act_o, is_first=False):
         for net_n in net_info.CONV_NETS:
             _ = conv_net_block(net_n, net_info, tensor_list, is_first, is_training, act_o)
         result = tensor_list[-1]
+    elif (net_info.name).startswith('netG'):
+        for net_n in net_info.CONV_NETS:
+            _ = conv_net_block(net_n, net_info, tensor_list, is_first, is_training, act_o)
+        result = tensor_list[-1]
     else:
         assert False, 'net_info.name ERROR = %s' % net_info.name
     return result
@@ -124,7 +128,7 @@ def regularization_cost(net_info):
     return cost
 
 
-def initialize_model(FLAGS):
+#def initialize_model(FLAGS):
 
 def netG_concat_value(tensor, v):
     v_t = tf.constant(v, dtype=tf.float32, shape=tensor.get_shape().as_list()[:3] + [1])
@@ -135,7 +139,7 @@ netG_act_o_2 = dict(size=2, index=1)
 netD_act_o   = dict(size=1, index=0)
 
 
-def get_netG_outputs(netG,train_df,test_df, FLAGS)
+def get_netG_outputs(netG,train_df,test_df, FLAGS):
     with tf.compat.v1.name_scope(netG.name):
         with tf.compat.v1.variable_scope(netG.variable_scope_name) as scope_full:
             with tf.compat.v1.variable_scope(netG.variable_scope_name + 'B') as scopeB:
@@ -180,7 +184,12 @@ def wgan_gp(fake_data, real_data):
         gradient_penalty = -tf.reduce_mean(input_tensor=tf.maximum(0., slopes-1.))
     return gradient_penalty
 
-def get_D_G_outputs(netD,netG,FLAGS):
+def get_D_G_outputs(netD,netG,netG_train_outputs,netG_train_output_for_netD_list,netG_test_outputs,gp_weight_1,gp_weight_2,FLAGS):
+    
+    netG_train_output1 , netG_train_output2 =  netG_train_outputs
+    netG_test_output1 , netG_test_output2 = netG_test_outputs
+    netG_train_output1_for_netD , netG_train_output2_for_netD = netG_train_output_for_netD_list
+
     with tf.compat.v1.name_scope(netD.name):
         with tf.compat.v1.variable_scope(netD.variable_scope_name) as scope_full:
             with tf.compat.v1.variable_scope(netD.variable_scope_name + 'A') as scopeA:
@@ -223,13 +232,15 @@ def get_D_G_outputs(netD,netG,FLAGS):
                     gradient_penalty_2 = tf.reduce_mean(input_tensor=tf.stack(w_list)) * gp_weight_2
     
     netD_train_outputs = [netD_train_output1_1,netD_train_output2_1,netD_train_output1_2,netD_train_output2_2]
-    netD_netG_train_outputs = [netD_netG_train_output1_1,netD_netG_train_output2_1,,netD_netG_train_output1_2,netD_netG_train_output2_2]
+    netD_test_outputs =  [netD_test_output1_1,netD_test_output2_1,netD_test_output1_2,netD_test_output2_2]
+    netD_netG_train_outputs = [netD_netG_train_output1_1,netD_netG_train_output2_1, netD_netG_train_output1_2 ,netD_netG_train_output2_2]
     gradient_penalties = [gradient_penalty_1,gradient_penalty_2]
 
-    return  netD_train_outputs,netD_netG_train_outputs, gradient_penalties
+    return  netD_train_outputs,netD_test_outputs,netD_netG_train_outputs, gradient_penalties
 
 def get_data_terms(netG_crops):
-     if FLAGS['loss_source_data_term_weight'] > 0:
+    netG_train_output1_crop,netG_train_output2_crop,netG_train_input1_crop,netG_train_input2_crop, netG_train_input1_label_crop, netG_train_input2_label_crop,netG_test_output1_crop,netG_test_output2_crop,netG_test_input1_crop,netG_test_input2_crop  =  netG_crops
+    if FLAGS['loss_source_data_term_weight'] > 0:
             if FLAGS['loss_source_data_term'] == 'l2':
                 train_data_term_1 = -tf.reduce_mean(input_tensor=tf.stack([img_L2_loss(a, b, FLAGS['loss_data_term_use_local_weight']) for a, b in zip(netG_train_output1_crop, netG_train_input1_crop)])) * FLAGS['loss_source_data_term_weight']
                 test_data_term_1  = -img_L2_loss(netG_test_output1_crop, netG_test_input1_crop, FLAGS['loss_data_term_use_local_weight']) * FLAGS['loss_source_data_term_weight']
@@ -249,19 +260,27 @@ def get_data_terms(netG_crops):
                 test_data_term_1  = -tf.reduce_mean(input_tensor=test_data_term_1)  * FLAGS['loss_source_data_term_weight']
             else:
                 assert False, 'data term error = %s' % FLAGS['loss_source_data_term']
-        else:
-            train_data_term_1 = tf.constant(0, dtype=FLAGS['data_compute_dtype'])
-            test_data_term_1 = tf.constant(0, dtype=FLAGS['data_compute_dtype'])
-            train_data_term_2 = tf.constant(0, dtype=FLAGS['data_compute_dtype'])
-            test_data_term_2 = tf.constant(0, dtype=FLAGS['data_compute_dtype'])
+    else:
+        train_data_term_1 = tf.constant(0, dtype=FLAGS['data_compute_dtype'])
+        test_data_term_1 = tf.constant(0, dtype=FLAGS['data_compute_dtype'])
+        train_data_term_2 = tf.constant(0, dtype=FLAGS['data_compute_dtype'])
+        test_data_term_2 = tf.constant(0, dtype=FLAGS['data_compute_dtype'])
 
     train_data_terms= [train_data_term_1 ,train_data_term_2 ]
     test_data_terms= [test_data_term_1 , test_data_term_2 ]
 
     return train_data_terms , test_data_terms 
 
-def get_netD_loss(netG_crops):
-     if FLAGS['loss_constant_term_weight'] > 0:
+def get_netD_loss(netG_train_output_inv_list,netG_test_output_inv_list,netG_crops, netD_train_outputs,netD_test_outputs):
+
+    netG_train_output1_crop,netG_train_output2_crop,netG_train_input1_crop,netG_train_input2_crop, netG_train_input1_label_crop,netG_train_input2_label_crop,netG_test_output1_crop,netG_test_output2_crop,netG_test_input1_crop,netG_test_input2_crop  = netG_crops
+
+    netG_train_output1_inv , netG_train_output2_inv = netG_train_output_inv_list
+    netG_test_output1_inv , netG_test_output2_inv = netG_test_output_inv_list
+    netD_train_output1_1,netD_train_output2_1,netD_train_output1_2,netD_train_output2_2 = netD_train_outputs
+    netD_test_output1_1,netD_test_output2_1,netD_test_output1_2,netD_test_output2_2 = netD_test_outputs
+    
+    if FLAGS['loss_constant_term_weight'] > 0:
             netG_train_output1_inv_crop = [tf_crop_rect(netG_train_output1_inv, train_df.mat1, i) for i in range(FLAGS['data_train_batch_size'])]
             netG_test_output1_inv_crop  =  tf_crop_rect(netG_test_output1_inv,  test_df.mat1,  0)
             netG_train_output2_inv_crop = [tf_crop_rect(netG_train_output2_inv, train_df.mat2, i) for i in range(FLAGS['data_train_batch_size'])]
@@ -285,25 +304,31 @@ def get_netD_loss(netG_crops):
             else:
                 assert False, 'constant data term error = %s' % FLAGS['loss_constant_term']
 
-        else:
-            train_constant_term_1 = tf.constant(0, dtype=FLAGS['data_compute_dtype'])
-            test_constant_term_1 = tf.constant(0, dtype=FLAGS['data_compute_dtype'])
-            train_constant_term_2 = tf.constant(0, dtype=FLAGS['data_compute_dtype'])
-            test_constant_term_2 = tf.constant(0, dtype=FLAGS['data_compute_dtype'])
+    else:
+        train_constant_term_1 = tf.constant(0, dtype=FLAGS['data_compute_dtype'])
+        test_constant_term_1 = tf.constant(0, dtype=FLAGS['data_compute_dtype'])
+        train_constant_term_2 = tf.constant(0, dtype=FLAGS['data_compute_dtype'])
+        test_constant_term_2 = tf.constant(0, dtype=FLAGS['data_compute_dtype'])
 
-        netD_train_loss = (-tf.reduce_mean(input_tensor=netD_train_output1_1) + tf.reduce_mean(input_tensor=netD_train_output2_1)) + (-tf.reduce_mean(input_tensor=netD_train_output1_2) + tf.reduce_mean(input_tensor=netD_train_output2_2))
-        netD_test_loss  = (-tf.reduce_mean(input_tensor=netD_test_output1_1)  + tf.reduce_mean(input_tensor=netD_test_output2_1))  + (-tf.reduce_mean(input_tensor=netD_test_output1_2)  + tf.reduce_mean(input_tensor=netD_test_output2_2))
-    
+    netD_train_loss = (-tf.reduce_mean(input_tensor=netD_train_output1_1) + tf.reduce_mean(input_tensor=netD_train_output2_1)) + (-tf.reduce_mean(input_tensor=netD_train_output1_2) + tf.reduce_mean(input_tensor=netD_train_output2_2))
+    netD_test_loss  = (-tf.reduce_mean(input_tensor=netD_test_output1_1)  + tf.reduce_mean(input_tensor=netD_test_output2_1))  + (-tf.reduce_mean(input_tensor=netD_test_output1_2)  + tf.reduce_mean(input_tensor=netD_test_output2_2))
+
     train_constant_term_list = [train_constant_term_1 , train_constant_term_2] 
     test_constant_term_list = [test_constant_term_1 , test_constant_term_2]
 
+    netG_train_output_inv_crop_list = [netG_train_output1_inv_crop,netG_train_output2_inv_crop]
+    netG_test_output_inv_crop_list =   [netG_test_output1_inv_crop,netG_test_output2_inv_crop]
+    
+    return netD_train_loss, netD_test_loss , train_constant_term_list ,test_constant_term_list, netG_train_output_inv_crop_list, netG_test_output_inv_crop_list
 
-    return netD_train_loss, netD_test_loss , train_constant_term_list ,test_constant_term_list
+def get_netG_loss(netD_netG_train_outputs,netD_train_outputs,netD_test_outputs):
 
-def get_net_G_loss(netD_netG_train_outputs,netD_netG_test_outputs,netD_test_outputs):
+    netD_train_output1_1,netD_train_output2_1,netD_train_output1_2,netD_train_output2_2 = netD_train_outputs
+    netD_test_output1_1,netD_test_output2_1,netD_test_output1_2,netD_test_output2_2 = netD_test_outputs 
+    netD_netG_train_output1_1,netD_netG_train_output2_1, netD_netG_train_output1_2 ,netD_netG_train_output2_2 = netD_netG_train_outputs 
 
 
-     def netG_improve_loss(be, af):
+    def netG_improve_loss(be, af):
             l = af - be
             l = tf.reduce_mean(input_tensor=tf.sign(l) * tf.square(l))
             return tf.sign(l) * tf.sqrt(tf.abs(l))
@@ -334,7 +359,12 @@ def get_net_G_loss(netD_netG_train_outputs,netD_netG_test_outputs,netD_test_outp
     return netG_train_loss, netG_test_loss ,netG_batch_list_train_loss , netG_train_list, netD_train_list, netG_test_list
 
 
-def get_losses(net_G_train_outputs , net_G_test_outputs, train_df, test_df ):
+def get_losses(netG_train_outputs , netG_test_outputs, train_df, test_df , netG_train_output_inv_list ,netG_test_output_inv_list,netD_netG_train_outputs,netD_train_outputs,netD_test_outputs,gradient_penalties,netG_w_regularization_loss,netD_w_regularization_loss ):
+
+    netG_train_output1 , netG_train_output2 =  netG_train_outputs
+    netG_test_output1 , netG_test_output2 = netG_test_outputs
+   
+
     with tf.compat.v1.name_scope("Loss"):
 
         netG_train_output1_crop = [tf_crop_rect(netG_train_output1, train_df.mat1, i) for i in range(FLAGS['data_train_batch_size'])]
@@ -353,19 +383,36 @@ def get_losses(net_G_train_outputs , net_G_test_outputs, train_df, test_df ):
         net_G_crops=[netG_train_output1_crop,netG_train_output2_crop,netG_train_input1_crop,netG_train_input2_crop\
             , netG_train_input1_label_crop,netG_train_input2_label_crop,netG_test_output1_crop,netG_test_output2_crop,netG_test_input1_crop,netG_test_input2_crop  ]
 
-        train_data_term_1 ,test_data_term_1 ,  train_data_term_2 ,test_data_term_2= get_data_terms()
+        train_data_terms ,test_data_terms = get_data_terms(net_G_crops)
 
-        get_netD_loss()
-        get_netG_loss()
-       
+        train_data_term_1 ,train_data_term_2 = train_data_terms
+        test_data_term_1 , test_data_term_2 = test_data_terms
+
+        netD_train_loss, netD_test_loss , train_constant_term_list ,test_constant_term_list, netG_train_output_inv_crop_list, netG_test_output_inv_crop_list = get_netD_loss(netG_train_output_inv_list,netG_test_output_inv_list,net_G_crops, netD_train_outputs,netD_test_outputs)
+        
+        train_constant_term_1 , train_constant_term_2 = train_constant_term_list 
+        test_constant_term_1 , test_constant_term_2 = test_constant_term_list
+        
+        netD_train_output1_1,netD_train_output2_1,netD_train_output1_2,netD_train_output2_2 = netD_train_outputs
+        netD_test_output1_1,netD_test_output2_1,netD_test_output1_2,netD_test_output2_2 = netD_test_outputs 
+
+        netD_train_loss = (-tf.reduce_mean(input_tensor=netD_train_output1_1) + tf.reduce_mean(input_tensor=netD_train_output2_1)) + (-tf.reduce_mean(input_tensor=netD_train_output1_2) + tf.reduce_mean(input_tensor=netD_train_output2_2))
+        netD_test_loss  = (-tf.reduce_mean(input_tensor=netD_test_output1_1)  + tf.reduce_mean(input_tensor=netD_test_output2_1))  + (-tf.reduce_mean(input_tensor=netD_test_output1_2)  + tf.reduce_mean(input_tensor=netD_test_output2_2))
+
+
+        netG_train_loss, netG_test_loss ,netG_batch_list_train_loss , netG_train_list, netD_train_list, netG_test_list = get_netG_loss( netD_netG_train_outputs,netD_train_outputs,netD_test_outputs)
+    
+        gradient_penalty_1,gradient_penalty_2 = gradient_penalties
 
         netG_loss = netG_train_loss + train_data_term_1 + train_data_term_2 + train_constant_term_1 + train_constant_term_2
         netD_loss = netD_train_loss + gradient_penalty_1 + gradient_penalty_2
 
     netG_total_loss = -netG_loss + netG_w_regularization_loss
     netD_total_loss = -netD_loss + netD_w_regularization_loss
-    netG_train_summary = [netG_train_loss, netG_train_1_1, netG_train_2_1, netG_train_1_2, netG_train_2_2, train_data_term_1, train_data_term_2, train_constant_term_1, train_constant_term_2, netG_tr_psnr1, netG_tr_psnr2, netG_r_loss, netG_gbc, netG_gac]
-    return netG_total_loss, netD_total_loss, netG_train_list,netD_train_list,netG_test_list,train_data_term_lit, train_constant_term_list
+    #netG_train_summary = [netG_train_loss, netG_train_1_1, netG_train_2_1, netG_train_1_2, netG_train_2_2, train_data_term_1, train_data_term_2, train_constant_term_1, train_constant_term_2, netG_tr_psnr1, netG_tr_psnr2, netG_r_loss, netG_gbc, netG_gac]
+    
+    return netG_total_loss, netD_total_loss, netG_loss , netD_loss,netG_train_loss,netD_train_loss ,netD_test_loss,netG_test_loss, netG_batch_list_train_loss, netG_train_list,netD_train_list,netG_test_list,train_data_terms, train_constant_term_list,test_data_terms, test_constant_term_list, net_G_crops,  netG_train_output_inv_crop_list, netG_test_output_inv_crop_list
+
 
 def get_G_gradient():
     with tf.compat.v1.name_scope("netG_SGD"):
@@ -391,8 +438,7 @@ def get_D_gradient():
 
         netD_gbc = tf.reduce_mean(input_tensor=tf.stack([tf.reduce_mean(input_tensor=tf.abs(v)) for v in netD_gbc]))
         netD_gac = tf.reduce_mean(input_tensor=tf.stack([tf.reduce_mean(input_tensor=tf.abs(v)) for v in netD_gac]))
-    r
-    eturn netD_opt,netD_gbc, netD_gac
+    return netD_opt,netD_gbc, netD_gac
 
 
 

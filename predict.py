@@ -1,11 +1,12 @@
 import os, sys
 import tensorflow as tf
 
-from DATA  import *
+
 from MODEL import *
 from FUNCTION import *
 from PREPROCESSING import *
-
+from DATA_infer  import *
+import argparse
 
 
 
@@ -24,19 +25,18 @@ def parse_args():
     parser.add_argument('--max_sequence_len', type=int)
     
     # data directories
-    parser.add_argument('--train', type=str, default=os.environ.get('SM_CHANNEL_TRAIN'))
-    parser.add_argument('--val', type=str, default=os.environ.get('SM_CHANNEL_VAL'))
+    parser.add_argument('--inference_dir', type=str, default='../input/LPGAN/input/')
+    parser.add_argument('--output_dir', type=str, default='../input/LPGAN-result/')
     
     # embedding directory
     parser.add_argument('--embedding', type=str, default=os.environ.get('SM_CHANNEL_EMBEDDING'))
     
     # model directory: we will use the default set by SageMaker, /opt/ml/model
-    parser.add_argument('--model_dir', type=str, default=os.environ.get('SM_MODEL_DIR'))
+    #parser.add_argument('--inference_dir', type=str, default=)
     
     return parser.parse_known_args()
 
 
-FLAGS['inference_folder'] = inference_folder
 
 tf.compat.v1.disable_eager_execution()
 print(tf.config.list_physical_devices('GPU'))
@@ -129,42 +129,16 @@ def getInputPhoto(file_name):
         return None
 
 def processImg(file_in_name, file_out_name_without_ext):
-    print(current_time() + ', [processImg]: file_name = %s' % (FLAGS['folder_infrence'] + file_in_name))
+    print(current_time() + ', [processImg]: file_name = %s' % (FLAGS['folder_inference'] + file_in_name))
     input_img = cv2.imread(FLAGS['folder_inference'] + file_in_name, -1)
     resize_input_img = normalizeImage(input_img, FLAGS['data_image_size'])
     resize_input_img, _, _ = random_pad_to_size(resize_input_img, FLAGS['data_image_size'], None, True, False)
-    resize_input_img = resize_input_img[None, :, :, :]
-
-    dict_d = [resize_input_img, 1]
-    dict_t = [test_df.input1_src, test_df.rate]
-    gfeature = sess.run(netG_test_gfeature1, feed_dict={t:d for t, d in zip(dict_t, dict_d)})
-
-    h, w, c = input_img.shape
-    rate = int(round(max(h, w) / FLAGS['data_image_size']))
-    if rate == 0:
-        rate = 1
-    padrf = rate * FLAGS['data_padrf_size']
-    patch = FLAGS['data_patch_size']
-    pad_h = 0 if h % patch == 0 else patch - (h % patch)
-    pad_w = 0 if w % patch == 0 else patch - (w % patch)
-    pad_h = pad_h + padrf if pad_h < padrf else pad_h
-    pad_w = pad_w + padrf if pad_w < padrf else pad_w
-
-    input_img = np.pad(input_img, [(padrf, pad_h), (padrf, pad_w), (0, 0)], 'reflect')
-    y_list = []
-    for y in range(padrf, h+padrf, patch):
-        x_list = []
-        for x in range(padrf, w+padrf, patch):
-            crop_img = input_img[None, y-padrf:y+padrf+patch, x-padrf:x+padrf+patch, :]
-            dict_d = [crop_img, gfeature, rate]
-            dict_t = [test_df.input1_src, test_df.input2, test_df.rate]
-            #enhance_test_img = sess.run(netG_test_dilation_list[min(9, rate-1)], feed_dict={t:d for t, d in zip(dict_t, dict_d)})
-            enhance_test_img = sess.run(netG_test_output1, feed_dict={t:d for t, d in zip(dict_t, dict_d)})
-            enhance_test_img = enhance_test_img[0, padrf:-padrf, padrf:-padrf, :]
-            x_list.append(enhance_test_img)
-        y_list.append(np.concatenate(x_list, axis=1))
-    enhance_test_img = np.concatenate(y_list, axis=0)
-    enhance_test_img = enhance_test_img[:h, :w, :]
+    input_img, _, rect = random_pad_to_size(input_img, FLAGS['data_image_size'], None, True, False)
+    input_img = input_img[None, :, :, :]
+    dict_d = [input_img, rect, 0]
+    dict_t = [test_df.input1_src] + \
+        test_df.mat1.rect + test_df.mat1.rot
+    enhance_test_img = sess.run(netG_test_output1_crop, feed_dict={t:d for t, d in zip(dict_t, dict_d)})
     enhance_test_img = safe_casting(enhance_test_img * tf.as_dtype(FLAGS['data_input_dtype']).max, FLAGS['data_input_dtype'])
     enhanced_img_file_name = file_out_name_without_ext + FLAGS['data_output_ext']
     enhance_img_file_path = FLAGS['folder_test_img'] + enhanced_img_file_name
@@ -173,12 +147,12 @@ def processImg(file_in_name, file_out_name_without_ext):
     #    os.remove(enhance_img_file_path)
     #except OSError as e:
     #    print(current_time() + ', remove fail, error = %s' % e.strerror)
-    #cv2.imwrite(enhance_img_file_path, enhance_test_img)
-    cv2.imwrite(FLAGS['folder_test_img'] + file_out_name_without_ext + '.jpg', enhance_test_img)
-    os.rename(FLAGS['folder_test_img'] + file_out_name_without_ext + '.jpg', enhance_img_file_path)
-
+    cv2.imwrite(enhance_img_file_path, enhance_test_img)
     return enhanced_img_file_name
 
 if __name__=='__main__':
+    args, _ = parse_args()
+
+    FLAGS['inference_folder'] = args.inference_dir
     print('processing')
     processImg('a0002.tif','totaltest')

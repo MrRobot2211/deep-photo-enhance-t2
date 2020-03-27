@@ -1,4 +1,4 @@
-from .DATA import *
+from DATA import *
 from PIL import Image
 from numpy import array
 
