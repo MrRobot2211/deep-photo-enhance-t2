@@ -5,6 +5,7 @@ from DATA import *
 from MODEL import *
 from FUNCTION import *
 from EVALUATION import *
+import tools
 import argparse
 
 def parse_args():
@@ -20,7 +21,6 @@ def parse_args():
     # data directories
     parser.add_argument('--train_input', type=str, default=FLAGS['folder_input'])
     parser.add_argument('--train_label', type=str, default=FLAGS['folder_label'])
-    #parser.add_argument('--test', type=str, default=FLAGS['folder_test'])
     
   
     # model directory: we will use the default set by SageMaker, /opt/ml/model
@@ -42,8 +42,8 @@ if __name__ == '__main__':
     FLAGS['input_folder']= args.train_input
     FLAGS['label_folder']= args.label_input
 
-    resize_image(FLAGS['input_folder'],max_length = 512)
-    resize_image(FLAGS['label_folder'],max_length = 512)
+    tools.resize_image(FLAGS['input_folder'],max_length = 512)
+    tools.resize_image(FLAGS['label_folder'],max_length = 512)
 
     tf.compat.v1.disable_eager_execution()
     print(tf.config.list_physical_devices('GPU'))

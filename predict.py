@@ -6,6 +6,7 @@ from MODEL import *
 from FUNCTION import *
 from PREPROCESSING import *
 from DATA_infer  import *
+import tools
 import argparse
 
 
@@ -144,6 +145,6 @@ if __name__=='__main__':
     args, _ = parse_args()
 
     FLAGS['inference_folder'] = args.inference_dir
-    resize_image(FLAGS['inference_folder'])
+    tools.resize_image(FLAGS['inference_folder'])
     print('processing')
     processImg('a0002.tif','totaltest')
