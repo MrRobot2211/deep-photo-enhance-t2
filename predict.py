@@ -18,22 +18,12 @@ def parse_args():
     parser.add_argument('--epochs', type=int, default=1)
     parser.add_argument('--batch_size', type=int, default=64)
     
-    parser.add_argument('--num_words', type=int)
-    parser.add_argument('--word_index_len', type=int)
-    parser.add_argument('--labels_index_len', type=int)
-    parser.add_argument('--embedding_dim', type=int)
-    parser.add_argument('--max_sequence_len', type=int)
     
     # data directories
     parser.add_argument('--inference_dir', type=str, default='../input/LPGAN/input/')
     parser.add_argument('--output_dir', type=str, default='../input/LPGAN-result/')
     
-    # embedding directory
-    parser.add_argument('--embedding', type=str, default=os.environ.get('SM_CHANNEL_EMBEDDING'))
-    
-    # model directory: we will use the default set by SageMaker, /opt/ml/model
-    #parser.add_argument('--inference_dir', type=str, default=)
-    
+   
     return parser.parse_known_args()
 
 
@@ -154,5 +144,6 @@ if __name__=='__main__':
     args, _ = parse_args()
 
     FLAGS['inference_folder'] = args.inference_dir
+    resize_image(FLAGS['inference_folder'])
     print('processing')
     processImg('a0002.tif','totaltest')
