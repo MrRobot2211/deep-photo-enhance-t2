@@ -2,7 +2,7 @@ import os, sys
 import tensorflow as tf
 
 
-from MODEL import *
+from MODEL import model
 from FUNCTION import *
 from PREPROCESSING import *
 from DATA_infer  import *

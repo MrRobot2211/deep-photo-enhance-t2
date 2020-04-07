@@ -69,19 +69,15 @@ FLAGS['process_max_epoch'] = 150
 
 FLAGS['format_log_step'] = '%.3f'
 FLAGS['format_log_value'] = '{:6.4f}'
-if FLAGS['sys_use_unix']:
-    FLAGS['path_char'] = '/'
-    if FLAGS['sys_is_dgx']:
-        FLAGS['path_data'] = '../input/LPGAN'
-        FLAGS['path_result_root'] = '../input/LPGAN-Result/%03d-DGX-LPGAN'
-        #FLAGS['path_result_root'] = model_+'/%03d-DGX-LPGAN'
-    else:
-        FLAGS['path_data'] = '/tmp3/nothinglo/dataset/LPGAN'
-        FLAGS['path_result_root'] = '/tmp3/nothinglo/dataset/LPGAN-Result/%03d-DGX-LPGAN'
+
+FLAGS['path_char'] = '/'
+if FLAGS['sys_is_dgx']:
+    FLAGS['path_data'] = '../input/LPGAN'
+    FLAGS['path_result_root'] = '../input/LPGAN-Result/%03d-DGX-LPGAN'
+    #FLAGS['path_result_root'] = model_+'/%03d-DGX-LPGAN'
 else:
-    FLAGS['path_char'] = '\\'
-    FLAGS['path_data'] = 'D:\\G\\LPGAN'
-    FLAGS['path_result_root'] = 'D:\\LPGAN\\%03d-DGX-LPGAN'
+    FLAGS['path_data'] = '/tmp3/nothinglo/dataset/LPGAN'
+    FLAGS['path_result_root'] = '/tmp3/nothinglo/dataset/LPGAN-Result/%03d-DGX-LPGAN'
 
 FLAGS['path_result'] = FLAGS['path_result_root'] % FLAGS['num_exp']
 FLAGS['load_path'] = FLAGS['path_result_root'] % FLAGS['load_previous_exp'] + FLAGS['path_char']

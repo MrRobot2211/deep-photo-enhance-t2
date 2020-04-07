@@ -27,6 +27,7 @@ FLAGS['process_random_seed'] = 2
 FLAGS['folder_inference'] = FLAGS['path_data'] + FLAGS['path_char'] + 'input' + FLAGS['path_char']
 FLAGS['folder_test_img']  = '../input/LPGAN-Result/'
 random.seed(FLAGS['process_random_seed'])
+
 class DataFlowMat(object):
     def __init__(self, b):
         self.rect      = [tf.compat.v1.placeholder(tf.int32)                    for _ in range(b)]

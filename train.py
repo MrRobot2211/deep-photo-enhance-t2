@@ -20,7 +20,7 @@ def parse_args():
     
     # data directories
     parser.add_argument('--train_input', type=str, default=FLAGS['folder_input'])
-    parser.add_argument('--train_label', type=str, default=FLAGS['folder_label'])
+    parser.add_argument('--label_input', type=str, default=FLAGS['folder_label'])
     
   
     # model directory: we will use the default set by SageMaker, /opt/ml/model
@@ -39,11 +39,11 @@ if __name__ == '__main__':
     FLAGS['process_max_epoch'] = args.epochs
     FLAGS['folder_model']= args.model_dir
     FLAGS['gpu']= args.n_gpu
-    FLAGS['input_folder']= args.train_input
-    FLAGS['label_folder']= args.label_input
+    FLAGS['folder_input']= args.train_input
+    FLAGS['folder_label']= args.label_input
 
-    tools.resize_image(FLAGS['input_folder'],max_length = 512)
-    tools.resize_image(FLAGS['label_folder'],max_length = 512)
+    tools.resize_image(FLAGS['folder_input'],max_length = 512)
+    tools.resize_image(FLAGS['folder_label'],max_length = 512)
 
     tf.compat.v1.disable_eager_execution()
     print(tf.config.list_physical_devices('GPU'))
@@ -342,201 +342,200 @@ if __name__ == '__main__':
     sess_config.gpu_options.allow_growth = (FLAGS['sys_use_all_gpu_memory'] == False)                                                                                                                 
 
 
-        with tf.compat.v1.Session(config=sess_config) as sess:
-            tf.compat.v1.global_variables_initializer().run()
-            tf.compat.v1.local_variables_initializer().run()
-            summary_writer = tf.compat.v1.summary.FileWriter(FLAGS['folder_log'], sess.graph)
-            coord = tf.train.Coordinator()
-            threads = tf.compat.v1.train.start_queue_runners(sess=sess, coord=coord)
-            timer = Timer()
-            data_run_time = timer.zero_time()
-            sess_run_time = timer.zero_time()
-            data_loader = DataLoader()
-            prepare_csr_dict(csr_dict, True)
+    with tf.compat.v1.Session(config=sess_config) as sess:
+        tf.compat.v1.global_variables_initializer().run()
+        tf.compat.v1.local_variables_initializer().run()
+        summary_writer = tf.compat.v1.summary.FileWriter(FLAGS['folder_log'], sess.graph)
+        coord = tf.train.Coordinator()
+        threads = tf.compat.v1.train.start_queue_runners(sess=sess, coord=coord)
+        timer = Timer()
+        data_run_time = timer.zero_time()
+        sess_run_time = timer.zero_time()
+        data_loader = DataLoader()
+        prepare_csr_dict(csr_dict, True)
 
-            print(current_time() + ", [netG] architecture_log :")
-            for s in netG.architecture_log:
-                print(current_time() + ", %s" % s)
+        print(current_time() + ", [netG] architecture_log :")
+        for s in netG.architecture_log:
+            print(current_time() + ", %s" % s)
 
-            print(current_time() + ", [netD] architecture_log :")
-            for s in netD.architecture_log:
-                print(current_time() + ", %s" % s)
+        print(current_time() + ", [netD] architecture_log :")
+        for s in netD.architecture_log:
+            print(current_time() + ", %s" % s)
 
-            start_epoch = int(FLAGS['process_epoch'])
-            remainder = FLAGS['process_epoch'] - start_epoch
-            start_iter = 0
-            if remainder != 0:
-                stamp_index_TRAIN = int(round(remainder * FLAGS['process_train_log_interval_epoch'])) + 1
-                stamp_index_TEST  = int(round(remainder * FLAGS['process_test_log_interval_epoch']))  + 1
-                start_iter        = LOG_STAMP_TEST[stamp_index_TEST - 1]                      + 1
+        start_epoch = int(FLAGS['process_epoch'])
+        remainder = FLAGS['process_epoch'] - start_epoch
+        start_iter = 0
+        if remainder != 0:
+            stamp_index_TRAIN = int(round(remainder * FLAGS['process_train_log_interval_epoch'])) + 1
+            stamp_index_TEST  = int(round(remainder * FLAGS['process_test_log_interval_epoch']))  + 1
+            start_iter        = LOG_STAMP_TEST[stamp_index_TEST - 1]                      + 1
 
-            list_train_loss = [-1e8] * FLAGS['data_train_sample_count_input']
-            indices_1 = list(range(FLAGS['data_train_sample_count_input']))
-            random.shuffle(indices_1)
-            indices_2 = list(range(FLAGS['data_train_sample_count_label']))
-            random.shuffle(indices_2)
+        list_train_loss = [-1e8] * FLAGS['data_train_sample_count_input']
+        indices_1 = list(range(FLAGS['data_train_sample_count_input']))
+        random.shuffle(indices_1)
+        indices_2 = list(range(FLAGS['data_train_sample_count_label']))
+        random.shuffle(indices_2)
 
-            if FLAGS['load_model_need']:
-                print(current_time() + ", Train loss data loading...: %s" % FLAGS['load_train_loss_path'])
-                list_train_loss = read_file_to_list(FLAGS['load_train_loss_path'], float)
-                print(current_time() + ", Train loss data restored from file: %s" % FLAGS['load_train_loss_path'])
+        if FLAGS['load_model_need']:
+            print(current_time() + ", Train loss data loading...: %s" % FLAGS['load_train_loss_path'])
+            list_train_loss = read_file_to_list(FLAGS['load_train_loss_path'], float)
+            print(current_time() + ", Train loss data restored from file: %s" % FLAGS['load_train_loss_path'])
 
-                print(current_time() + ", Train indices input data loading...: %s" % FLAGS['load_train_indices_input_path'])
-                indices_1 = read_file_to_list(FLAGS['load_train_indices_input_path'], int)
-                print(current_time() + ", Train indices input data restored from file: %s" % FLAGS['load_train_indices_input_path'])
+            print(current_time() + ", Train indices input data loading...: %s" % FLAGS['load_train_indices_input_path'])
+            indices_1 = read_file_to_list(FLAGS['load_train_indices_input_path'], int)
+            print(current_time() + ", Train indices input data restored from file: %s" % FLAGS['load_train_indices_input_path'])
 
-                print(current_time() + ", Train indices label data loading...: %s" % FLAGS['load_train_indices_label_path'])
-                indices_2 = read_file_to_list(FLAGS['load_train_indices_label_path'], int)
-                print(current_time() + ", Train indices label data restored from file: %s" % FLAGS['load_train_indices_label_path'])
+            print(current_time() + ", Train indices label data loading...: %s" % FLAGS['load_train_indices_label_path'])
+            indices_2 = read_file_to_list(FLAGS['load_train_indices_label_path'], int)
+            print(current_time() + ", Train indices label data restored from file: %s" % FLAGS['load_train_indices_label_path'])
 
-                print(current_time() + ", Model loading...: %s" % FLAGS['load_model_path'])
-                saver.restore(sess, FLAGS['load_model_path'])
-                print(current_time() + ", Model restored from file: %s" % FLAGS['load_model_path'])
+            print(current_time() + ", Model loading...: %s" % FLAGS['load_model_path'])
+            saver.restore(sess, FLAGS['load_model_path'])
+            print(current_time() + ", Model restored from file: %s" % FLAGS['load_model_path'])
 
-            if FLAGS['process_train_data_loader_count'] > 0:
-                data_loader.enqueue_train_indices_by_data(indices_1, indices_2, start_iter)
+        if FLAGS['process_train_data_loader_count'] > 0:
+            data_loader.enqueue_train_indices_by_data(indices_1, indices_2, start_iter)
 
-            flag_keys = FLAGS.keys()
-            flag_keys = sorted(flag_keys)
-            for key in flag_keys:
-                print(current_time() + ', [%s] : %s' % (key, str(FLAGS[key])))
+        flag_keys = FLAGS.keys()
+        flag_keys = sorted(flag_keys)
+        for key in flag_keys:
+            print(current_time() + ', [%s] : %s' % (key, str(FLAGS[key])))
 
-            best_value_history = [-1e8] * len(netG_test_summary_names)
-            train_summary_datas = []
-            if FLAGS['process_train_data_loader_count'] <= 0 or (FLAGS['process_run_first_testing_epoch'] and FLAGS['process_epoch'] == 0):
-            best_value_history, train_summary_datas = do_testing(FLAGS['format_log_step'] % 0, data_loader, best_value_history, indices_1, indices_2, list_train_loss, \
-                summary_writer, train_summary_datas, FLAGS['process_train_data_loader_count'] > 0)
+        best_value_history = [-1e8] * len(netG_test_summary_names)
+        train_summary_datas = []
+        if FLAGS['process_train_data_loader_count'] <= 0 or (FLAGS['process_run_first_testing_epoch'] and FLAGS['process_epoch'] == 0):
+            best_value_history, train_summary_datas = do_testing(FLAGS['format_log_step'] % 0, data_loader, best_value_history, indices_1, indices_2, list_train_loss, summary_writer, train_summary_datas, FLAGS['process_train_data_loader_count'] > 0)
 
-            if FLAGS['process_train_data_loader_count'] > 0:
-                total_iter = start_epoch * FLAGS['data_train_batch_count'] 
-                netD_base_lr = FLAGS['netD_base_learning_rate']
-                netG_base_lr = FLAGS['netG_base_learning_rate']
-                netD_wgan_gp_mvavg_1 = 0
-                netD_wgan_gp_mvavg_2 = 0
-                netD_gp_weight_1 = FLAGS['loss_wgan_lambda']
-                netD_gp_weight_2 = FLAGS['loss_wgan_lambda']
-                netD_update_buffer_1 = 0
-                netD_change_times_1 = FLAGS['netD_times']
-                netD_update_buffer_2 = 0
-                netD_change_times_2 = FLAGS['netD_times']
-                netD_times = -FLAGS['netD_init_times']
-                for epoch in range(start_epoch, FLAGS['process_max_epoch']):
-                    if epoch != start_epoch or remainder == 0:
-                        start_iter = 0
-                        stamp_index_TRAIN = 0 if epoch == 0 else 1
-                        stamp_index_TEST = 1
+        if FLAGS['process_train_data_loader_count'] > 0:
+            total_iter = start_epoch * FLAGS['data_train_batch_count'] 
+            netD_base_lr = FLAGS['netD_base_learning_rate']
+            netG_base_lr = FLAGS['netG_base_learning_rate']
+            netD_wgan_gp_mvavg_1 = 0
+            netD_wgan_gp_mvavg_2 = 0
+            netD_gp_weight_1 = FLAGS['loss_wgan_lambda']
+            netD_gp_weight_2 = FLAGS['loss_wgan_lambda']
+            netD_update_buffer_1 = 0
+            netD_change_times_1 = FLAGS['netD_times']
+            netD_update_buffer_2 = 0
+            netD_change_times_2 = FLAGS['netD_times']
+            netD_times = -FLAGS['netD_init_times']
+            for epoch in range(start_epoch, FLAGS['process_max_epoch']):
+                if epoch != start_epoch or remainder == 0:
+                    start_iter = 0
+                    stamp_index_TRAIN = 0 if epoch == 0 else 1
+                    stamp_index_TEST = 1
 
-                    netG_train_avg = [0] * len(netG_train_summary_names)
-                    netD_train_avg = [0] * len(netD_train_summary_names)
-                    netG_train_c_count = 0
-                    netD_train_c_count = 0
+                netG_train_avg = [0] * len(netG_train_summary_names)
+                netD_train_avg = [0] * len(netD_train_summary_names)
+                netG_train_c_count = 0
+                netD_train_c_count = 0
 
-                    for iter in range(start_iter, FLAGS['data_train_batch_count']):
-                        timer.start()
-                        data = data_loader.get_next_train_batch()
-                        update_cache_dict(data['csr_ind1'], data['csr_val1'], data['csr_ind_r1'], data['csr_val_r1'], data['csr_ind_g1'], data['csr_val_g1'], data['csr_ind_b1'], data['csr_val_b1'], data['csr_names1'])
-                        update_cache_dict(data['csr_ind2'], data['csr_val2'], data['csr_ind_r2'], data['csr_val_r2'], data['csr_ind_g2'], data['csr_val_g2'], data['csr_ind_b2'], data['csr_val_b2'], data['csr_names2'])
-                        data_run_time = data_run_time + timer.end()
+                for iter in range(start_iter, FLAGS['data_train_batch_count']):
+                    timer.start()
+                    data = data_loader.get_next_train_batch()
+                    update_cache_dict(data['csr_ind1'], data['csr_val1'], data['csr_ind_r1'], data['csr_val_r1'], data['csr_ind_g1'], data['csr_val_g1'], data['csr_ind_b1'], data['csr_val_b1'], data['csr_names1'])
+                    update_cache_dict(data['csr_ind2'], data['csr_val2'], data['csr_ind_r2'], data['csr_val_r2'], data['csr_ind_g2'], data['csr_val_g2'], data['csr_ind_b2'], data['csr_val_b2'], data['csr_names2'])
+                    data_run_time = data_run_time + timer.end()
 
-                        # 1th netD
-                        dict_d = [data['input'], data['label'], netD_base_lr, netD_gp_weight_1, netD_gp_weight_2]
-                        dict_t = [train_df.input1_src, train_df.input2_src, netD.base_lr, gp_weight_1, gp_weight_2]
+                    # 1th netD
+                    dict_d = [data['input'], data['label'], netD_base_lr, netD_gp_weight_1, netD_gp_weight_2]
+                    dict_t = [train_df.input1_src, train_df.input2_src, netD.base_lr, gp_weight_1, gp_weight_2]
 
-                        _, netD_train_s = sess.run([\
-                            netD_opt, netD_train_summary], \
+                    _, netD_train_s = sess.run([\
+                        netD_opt, netD_train_summary], \
+                            feed_dict={t:d for t, d in zip(dict_t, dict_d)})
+                    netD_train_avg = [netD_train_avg[i] + v for i, v in enumerate(netD_train_s)]
+                    netD_train_c_count += 1
+
+                    if not (epoch * FLAGS['data_train_batch_count'] + iter < FLAGS['loss_wgan_lambda_ignore']):
+                        netD_wgan_gp_mvavg_1 = netD_wgan_gp_mvavg_1 * FLAGS['loss_wgan_gp_mv_decay'] + (-netD_train_s[-7] / netD_gp_weight_1) * (1 - FLAGS['loss_wgan_gp_mv_decay'])
+                        netD_wgan_gp_mvavg_2 = netD_wgan_gp_mvavg_2 * FLAGS['loss_wgan_gp_mv_decay'] + (-netD_train_s[-6] / netD_gp_weight_2) * (1 - FLAGS['loss_wgan_gp_mv_decay'])
+
+                    if netD_update_buffer_1 == 0 and netD_wgan_gp_mvavg_1 > FLAGS['loss_wgan_gp_bound']:
+                        netD_gp_weight_1 = netD_gp_weight_1 * FLAGS['loss_wgan_lambda_grow']
+                        netD_change_times_1 = netD_change_times_1 * FLAGS['netD_times_grow']
+                        netD_update_buffer_1 = FLAGS['netD_buffer_times']
+                        netD_wgan_gp_mvavg_1 = 0
+                    netD_update_buffer_1 = 0 if netD_update_buffer_1 == 0 else netD_update_buffer_1 - 1
+
+                    if netD_update_buffer_2 == 0 and netD_wgan_gp_mvavg_2 > FLAGS['loss_wgan_gp_bound']:
+                        netD_gp_weight_2 = netD_gp_weight_2 * FLAGS['loss_wgan_lambda_grow']
+                        netD_change_times_2 = netD_change_times_2 * FLAGS['netD_times_grow']
+                        netD_update_buffer_2 = FLAGS['netD_buffer_times']
+                        netD_wgan_gp_mvavg_2 = 0
+                    netD_update_buffer_2 = 0 if netD_update_buffer_2 == 0 else netD_update_buffer_2 - 1
+
+                    # 2th netG
+                    if netD_change_times_1 > 0 and netD_times >= 0 and netD_times % netD_change_times_1 == 0: 
+                        netD_times = 0
+                        #data['input'], data['label'], netG_base_lr, data['input_label'], data['label_input']] + \
+                        dict_d = [\
+                            data['input'], data['label'], netG_base_lr, data['input_label']] + \
+                            data['rect1'] + data['rot1'] + \
+                            data['rect2'] + data['rot2'] + \
+                            data['csr_ind1']   + data['csr_val1'] + \
+                            data['csr_ind_r1'] + data['csr_val_r1'] + \
+                            data['csr_ind_g1'] + data['csr_val_g1'] + \
+                            data['csr_ind_b1'] + data['csr_val_b1'] + data['csr_sha1'] + \
+                            data['csr_ind2']   + data['csr_val2'] + \
+                            data['csr_ind_r2'] + data['csr_val_r2'] + \
+                            data['csr_ind_g2'] + data['csr_val_g2'] + \
+                            data['csr_ind_b2'] + data['csr_val_b2'] + data['csr_sha2']
+                            #train_df.input1_src, train_df.input2_src, netG.base_lr, train_df.input1_label_src, train_df.input2_label_src] + \
+                        dict_t = [\
+                            train_df.input1_src, train_df.input2_src, netG.base_lr, train_df.input1_label_src] + \
+                            train_df.mat1.rect + train_df.mat1.rot + \
+                            train_df.mat2.rect + train_df.mat2.rot + \
+                            train_df.mat1.csr_ind   + train_df.mat1.csr_val + \
+                            train_df.mat1.csr_ind_r + train_df.mat1.csr_val_r + \
+                            train_df.mat1.csr_ind_g + train_df.mat1.csr_val_g + \
+                            train_df.mat1.csr_ind_b + train_df.mat1.csr_val_b + train_df.mat1.csr_sha + \
+                            train_df.mat2.csr_ind   + train_df.mat2.csr_val + \
+                            train_df.mat2.csr_ind_r + train_df.mat2.csr_val_r + \
+                            train_df.mat2.csr_ind_g + train_df.mat2.csr_val_g + \
+                            train_df.mat2.csr_ind_b + train_df.mat2.csr_val_b + train_df.mat2.csr_sha
+
+                        _, netG_train_s, batch_list_train_c = sess.run([\
+                            netG_opt, netG_train_summary, netG_batch_list_train_loss], \
                                 feed_dict={t:d for t, d in zip(dict_t, dict_d)})
-                        netD_train_avg = [netD_train_avg[i] + v for i, v in enumerate(netD_train_s)]
-                        netD_train_c_count += 1
+                        netG_train_avg = [netG_train_avg[i] + v for i, v in enumerate(netG_train_s)]
+                        netG_train_c_count += 1
+                    else:
+                        batch_list_train_c = []
+                    netD_times += 1
+                    sess_run_time = sess_run_time + timer.end()
 
-                        if not (epoch * FLAGS['data_train_batch_count'] + iter < FLAGS['loss_wgan_lambda_ignore']):
-                            netD_wgan_gp_mvavg_1 = netD_wgan_gp_mvavg_1 * FLAGS['loss_wgan_gp_mv_decay'] + (-netD_train_s[-7] / netD_gp_weight_1) * (1 - FLAGS['loss_wgan_gp_mv_decay'])
-                            netD_wgan_gp_mvavg_2 = netD_wgan_gp_mvavg_2 * FLAGS['loss_wgan_gp_mv_decay'] + (-netD_train_s[-6] / netD_gp_weight_2) * (1 - FLAGS['loss_wgan_gp_mv_decay'])
+                    for i in range(len(batch_list_train_c)):
+                        list_train_loss[indices_1[iter*FLAGS['data_train_batch_size']+i]] = batch_list_train_c[i]
 
-                        if netD_update_buffer_1 == 0 and netD_wgan_gp_mvavg_1 > FLAGS['loss_wgan_gp_bound']:
-                            netD_gp_weight_1 = netD_gp_weight_1 * FLAGS['loss_wgan_lambda_grow']
-                            netD_change_times_1 = netD_change_times_1 * FLAGS['netD_times_grow']
-                            netD_update_buffer_1 = FLAGS['netD_buffer_times']
-                            netD_wgan_gp_mvavg_1 = 0
-                        netD_update_buffer_1 = 0 if netD_update_buffer_1 == 0 else netD_update_buffer_1 - 1
+                    now_epoch = FLAGS['format_log_step'] % (epoch + (iter + 1.0) / FLAGS['data_train_batch_count'])
 
-                        if netD_update_buffer_2 == 0 and netD_wgan_gp_mvavg_2 > FLAGS['loss_wgan_gp_bound']:
-                            netD_gp_weight_2 = netD_gp_weight_2 * FLAGS['loss_wgan_lambda_grow']
-                            netD_change_times_2 = netD_change_times_2 * FLAGS['netD_times_grow']
-                            netD_update_buffer_2 = FLAGS['netD_buffer_times']
-                            netD_wgan_gp_mvavg_2 = 0
-                        netD_update_buffer_2 = 0 if netD_update_buffer_2 == 0 else netD_update_buffer_2 - 1
+                    if iter == LOG_STAMP_TRAIN[stamp_index_TRAIN]:
+                        netG_train_avg = [netG_train_avg[i] / (netG_train_c_count if netG_train_c_count != 0 else 1) for i, v in enumerate(netG_train_avg)]
+                        netD_train_avg = [netD_train_avg[i] / (netD_train_c_count if netD_train_c_count != 0 else 1) for i, v in enumerate(netD_train_avg)]
+                        data_run_time, sess_run_time, train_summary_datas = do_training_log(\
+                            sess, train_summary_datas, now_epoch, netG_train_avg + netD_train_avg, data_run_time, sess_run_time, netG_train_c_count, netD_train_c_count, netD_wgan_gp_mvavg_1, netD_wgan_gp_mvavg_2)
+                        stamp_index_TRAIN += 1
+                        netG_train_avg = [0] * len(netG_train_summary_names)
+                        netD_train_avg = [0] * len(netD_train_summary_names)
+                        netG_train_c_count = 0
+                        netD_train_c_count = 0
 
-                        # 2th netG
-                        if netD_change_times_1 > 0 and netD_times >= 0 and netD_times % netD_change_times_1 == 0: 
-                            netD_times = 0
-                            #data['input'], data['label'], netG_base_lr, data['input_label'], data['label_input']] + \
-                            dict_d = [\
-                                data['input'], data['label'], netG_base_lr, data['input_label']] + \
-                                data['rect1'] + data['rot1'] + \
-                                data['rect2'] + data['rot2'] + \
-                                data['csr_ind1']   + data['csr_val1'] + \
-                                data['csr_ind_r1'] + data['csr_val_r1'] + \
-                                data['csr_ind_g1'] + data['csr_val_g1'] + \
-                                data['csr_ind_b1'] + data['csr_val_b1'] + data['csr_sha1'] + \
-                                data['csr_ind2']   + data['csr_val2'] + \
-                                data['csr_ind_r2'] + data['csr_val_r2'] + \
-                                data['csr_ind_g2'] + data['csr_val_g2'] + \
-                                data['csr_ind_b2'] + data['csr_val_b2'] + data['csr_sha2']
-                                #train_df.input1_src, train_df.input2_src, netG.base_lr, train_df.input1_label_src, train_df.input2_label_src] + \
-                            dict_t = [\
-                                train_df.input1_src, train_df.input2_src, netG.base_lr, train_df.input1_label_src] + \
-                                train_df.mat1.rect + train_df.mat1.rot + \
-                                train_df.mat2.rect + train_df.mat2.rot + \
-                                train_df.mat1.csr_ind   + train_df.mat1.csr_val + \
-                                train_df.mat1.csr_ind_r + train_df.mat1.csr_val_r + \
-                                train_df.mat1.csr_ind_g + train_df.mat1.csr_val_g + \
-                                train_df.mat1.csr_ind_b + train_df.mat1.csr_val_b + train_df.mat1.csr_sha + \
-                                train_df.mat2.csr_ind   + train_df.mat2.csr_val + \
-                                train_df.mat2.csr_ind_r + train_df.mat2.csr_val_r + \
-                                train_df.mat2.csr_ind_g + train_df.mat2.csr_val_g + \
-                                train_df.mat2.csr_ind_b + train_df.mat2.csr_val_b + train_df.mat2.csr_sha
-
-                            _, netG_train_s, batch_list_train_c = sess.run([\
-                                netG_opt, netG_train_summary, netG_batch_list_train_loss], \
-                                    feed_dict={t:d for t, d in zip(dict_t, dict_d)})
-                            netG_train_avg = [netG_train_avg[i] + v for i, v in enumerate(netG_train_s)]
-                            netG_train_c_count += 1
-                        else:
-                            batch_list_train_c = []
-                        netD_times += 1
-                        sess_run_time = sess_run_time + timer.end()
-
-                        for i in range(len(batch_list_train_c)):
-                            list_train_loss[indices_1[iter*FLAGS['data_train_batch_size']+i]] = batch_list_train_c[i]
-
-                        now_epoch = FLAGS['format_log_step'] % (epoch + (iter + 1.0) / FLAGS['data_train_batch_count'])
-
-                        if iter == LOG_STAMP_TRAIN[stamp_index_TRAIN]:
-                            netG_train_avg = [netG_train_avg[i] / (netG_train_c_count if netG_train_c_count != 0 else 1) for i, v in enumerate(netG_train_avg)]
-                            netD_train_avg = [netD_train_avg[i] / (netD_train_c_count if netD_train_c_count != 0 else 1) for i, v in enumerate(netD_train_avg)]
-                            data_run_time, sess_run_time, train_summary_datas = do_training_log(\
-                                sess, train_summary_datas, now_epoch, netG_train_avg + netD_train_avg, data_run_time, sess_run_time, netG_train_c_count, netD_train_c_count, netD_wgan_gp_mvavg_1, netD_wgan_gp_mvavg_2)
-                            stamp_index_TRAIN += 1
-                            netG_train_avg = [0] * len(netG_train_summary_names)
-                            netD_train_avg = [0] * len(netD_train_summary_names)
-                            netG_train_c_count = 0
-                            netD_train_c_count = 0
-
-                        if iter == LOG_STAMP_TEST[stamp_index_TEST]:
-                            best_value_history, train_summary_datas = do_testing(now_epoch, data_loader, best_value_history, indices_1, indices_2, list_train_loss, \
-                                summary_writer, train_summary_datas, True)
-                            stamp_index_TEST += 1
-                        total_iter = total_iter + 1
-                    if epoch >= FLAGS['netD_base_learning_decay_epoch']:
-                        netD_base_lr = netD_base_lr - (FLAGS['netD_base_learning_rate'] / FLAGS['netD_base_learning_decay'])
-                        print(current_time() + ', epoch = ' + now_epoch + ', new netD_base_lr = %g' % netD_base_lr)
-                    if epoch >= FLAGS['netG_base_learning_decay_epoch']:
-                        netG_base_lr = netG_base_lr - (FLAGS['netG_base_learning_rate'] / FLAGS['netG_base_learning_decay'])
-                        print(current_time() + ', epoch = ' + now_epoch + ', new netG_base_lr = %g' % netG_base_lr)
-                    indices_1, indices_2 = data_loader.enqueue_train_indices_by_shuffle_method(indices_1, indices_2, 0)
-            coord.request_stop()
-            coord.join(threads)
-            sess.close()
+                    if iter == LOG_STAMP_TEST[stamp_index_TEST]:
+                        best_value_history, train_summary_datas = do_testing(now_epoch, data_loader, best_value_history, indices_1, indices_2, list_train_loss, \
+                            summary_writer, train_summary_datas, True)
+                        stamp_index_TEST += 1
+                    total_iter = total_iter + 1
+                if epoch >= FLAGS['netD_base_learning_decay_epoch']:
+                    netD_base_lr = netD_base_lr - (FLAGS['netD_base_learning_rate'] / FLAGS['netD_base_learning_decay'])
+                    print(current_time() + ', epoch = ' + now_epoch + ', new netD_base_lr = %g' % netD_base_lr)
+                if epoch >= FLAGS['netG_base_learning_decay_epoch']:
+                    netG_base_lr = netG_base_lr - (FLAGS['netG_base_learning_rate'] / FLAGS['netG_base_learning_decay'])
+                    print(current_time() + ', epoch = ' + now_epoch + ', new netG_base_lr = %g' % netG_base_lr)
+                indices_1, indices_2 = data_loader.enqueue_train_indices_by_shuffle_method(indices_1, indices_2, 0)
+        coord.request_stop()
+        coord.join(threads)
+        sess.close()
 
 
 
