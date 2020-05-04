@@ -57,7 +57,7 @@ FLAGS['loss_heavy'] = (FLAGS['loss_constant_term_weight'] > 0)
 
 FLAGS['data_augmentation_size'] = 8
 FLAGS['data_use_random_pad'] = False
-FLAGS['data_train_batch_size'] = 3
+FLAGS['data_train_batch_size'] = 4
 FLAGS['load_previous_exp']   = 0
 FLAGS['load_previous_epoch'] = 0
 
@@ -69,15 +69,19 @@ FLAGS['process_max_epoch'] = 150
 
 FLAGS['format_log_step'] = '%.3f'
 FLAGS['format_log_value'] = '{:6.4f}'
-
-FLAGS['path_char'] = '/'
-if FLAGS['sys_is_dgx']:
-    FLAGS['path_data'] = '../input/LPGAN'
-    FLAGS['path_result_root'] = '../input/LPGAN-Result/%03d-DGX-LPGAN'
-    #FLAGS['path_result_root'] = model_+'/%03d-DGX-LPGAN'
+if FLAGS['sys_use_unix']:
+    FLAGS['path_char'] = '/'
+    if FLAGS['sys_is_dgx']:
+        FLAGS['path_data'] = '../input/LPGAN'
+        FLAGS['path_result_root'] = '../input/LPGAN-Result/%03d-DGX-LPGAN'
+        #FLAGS['path_result_root'] = model_+'/%03d-DGX-LPGAN'
+    else:
+        FLAGS['path_data'] = '/tmp3/nothinglo/dataset/LPGAN'
+        FLAGS['path_result_root'] = '/tmp3/nothinglo/dataset/LPGAN-Result/%03d-DGX-LPGAN'
 else:
-    FLAGS['path_data'] = '/tmp3/nothinglo/dataset/LPGAN'
-    FLAGS['path_result_root'] = '/tmp3/nothinglo/dataset/LPGAN-Result/%03d-DGX-LPGAN'
+    FLAGS['path_char'] = '\\'
+    FLAGS['path_data'] = 'D:\\G\\LPGAN'
+    FLAGS['path_result_root'] = 'D:\\LPGAN\\%03d-DGX-LPGAN'
 
 FLAGS['path_result'] = FLAGS['path_result_root'] % FLAGS['num_exp']
 FLAGS['load_path'] = FLAGS['path_result_root'] % FLAGS['load_previous_exp'] + FLAGS['path_char']
@@ -93,7 +97,7 @@ FLAGS['process_test_drop_summary_step'] = 1
 FLAGS['process_train_data_loader_count'] = (8 if FLAGS['sys_use_unix'] else 4) if FLAGS['loss_pr'] else 2
 
 # data
-FLAGS['data_input_ext'] = '.tif'
+FLAGS['data_input_ext'] = ''    #'.tif'
 FLAGS['data_input_dtype']   = np.uint8
 FLAGS['data_label_dtype']   = np.uint8
 FLAGS['data_compute_dtype'] = np.float32
@@ -411,10 +415,10 @@ class DataLoader(object):
                 label_img = cv2.imread(FLAGS['folder_label'] + file_name + FLAGS['data_input_ext'], -1)
                 
                 
-                print(file_name)
+                # print(file_name)
 
-                print(input_img.shape)
-                print(label_img.shape)
+                # print(input_img.shape)
+                # print(label_img.shape)
 
 
 
@@ -476,10 +480,10 @@ class DataLoader(object):
 
             input_label_img = cv2.imread(FLAGS['folder_label'] + file_name_input + FLAGS['data_input_ext'], -1)
             #label_input_img = cv2.imread(FLAGS['folder_input'] + file_name_label + FLAGS['data_input_ext'], -1)
-            print(FLAGS['folder_input'] + file_name_input + FLAGS['data_input_ext'])
-            print(input_img.shape)
-            print(FLAGS['folder_label'] + file_name_label + FLAGS['data_input_ext'])
-            print(label_img.shape)
+            # print(FLAGS['folder_input'] + file_name_input + FLAGS['data_input_ext'])
+            # print(input_img.shape)
+            # print(FLAGS['folder_label'] + file_name_label + FLAGS['data_input_ext'])
+            # print(label_img.shape)
             pix_c1 = input_img.shape[0] * input_img.shape[1]
             pix_c2 = label_img.shape[0] * label_img.shape[1]
 
@@ -502,6 +506,9 @@ class DataLoader(object):
 
             for i, j in zip(indices_1, indices_2):
                 #input_img, label_img, input_label_img, label_input_img = get_patch(train_image_name_list_input[i], train_image_name_list_label[j])
+                # print(train_image_name_list_input[i])
+                # print(train_image_name_list_label[j])
+                
                 input_img, label_img, input_label_img = get_patch(train_image_name_list_input[i], train_image_name_list_label[j])
                 rot1 = i % FLAGS['data_augmentation_size']
                 rot2 = j % FLAGS['data_augmentation_size']
@@ -520,10 +527,45 @@ class DataLoader(object):
                 data_batch['rect2'].append(rect2)
                 data_batch['rot2'].append(rot2)
             batch_queue.put(data_batch)
+
     def get_next_test_input_batch(self):
         return self.test_input_batch_queue.get()
     def get_next_test_label(self):
         return self.test_label_queue.get()
     def get_next_train_batch(self):
         return self.train_batch_queue.get()
+
+
+if __name__ == '__main__':
+
+                #input_img, label_img, input_label_img, label_input_img = get_patch(train_image_name_list_input[i], train_image_name_list_label[j])
+                DataLoader()
+
+                indices_1 = list(range(FLAGS['data_train_sample_count_input']))
+                random.shuffle(indices_1)
+                indices_2 = list(range(FLAGS['data_train_sample_count_label']))
+                random.shuffle(indices_2)
+
+
+
+                for i, j in zip(indices_1, indices_2):
+                    print(train_image_name_list_input[i])
+                    print(train_image_name_list_label[j])
+                    file_name_input = train_image_name_list_input[i]
+                    file_name_label = train_image_name_list_label[j]
+
+
+                    input_img = cv2.imread(FLAGS['folder_input'] + file_name_input + FLAGS['data_input_ext'], -1)
+                    if os.path.exists(FLAGS['folder_label'] + file_name_label + FLAGS['data_input_ext']):
+                        label_img = cv2.imread(FLAGS['folder_label'] + file_name_label + FLAGS['data_input_ext'], -1)
+                    else:
+                        label_img = cv2.imread(FLAGS['folder_label_HDR'] + file_name_label + FLAGS['data_input_ext'], -1)
+
+                    input_label_img = cv2.imread(FLAGS['folder_label'] + file_name_input + FLAGS['data_input_ext'], -1)
+                    #label_input_img = cv2.imread(FLAGS['folder_input'] + file_name_label + FLAGS['data_input_ext'], -1)
+                    print(FLAGS['folder_input'] + file_name_input + FLAGS['data_input_ext'])
+                    print(input_label_img.shape)
+                    print(FLAGS['folder_label'] + file_name_label + FLAGS['data_input_ext'])
+                    print(label_img.shape)
+
 

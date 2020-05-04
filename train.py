@@ -16,7 +16,7 @@ def parse_args():
     parser.add_argument('--epochs', type=int, default=100)
     parser.add_argument('--batch_size', type=int, default=64)
     parser.add_argument('--lr', type=int, default=0.01)
-    parser.add_argument('--n_gpu', type=int)
+    parser.add_argument('--n_gpu', type=int, default= 3)
     
     # data directories
     parser.add_argument('--train_input', type=str, default=FLAGS['folder_input'])
@@ -261,22 +261,22 @@ if __name__ == '__main__':
                 enhance_test_img2 = safe_casting(enhance_test_img2 * tf.as_dtype(FLAGS['data_input_dtype']).max, FLAGS['data_input_dtype'])
                 enhance_test_img2_inv = safe_casting(enhance_test_img2_inv * tf.as_dtype(FLAGS['data_input_dtype']).max, FLAGS['data_input_dtype'])
                 if is_training:
-                    cv2.imwrite(FLAGS['folder_test_img'] + 'A-' + test_image_name_list[i] + '-' + now_epoch + FLAGS['data_input_ext'], enhance_test_img1)
-                    cv2.imwrite(FLAGS['folder_test_img'] + 'A-' + test_image_name_list[i] + '-i' + now_epoch + FLAGS['data_input_ext'], enhance_test_img1_inv)
-                    cv2.imwrite(FLAGS['folder_test_img'] + 'B-' + test_image_name_list[i] + '-' + now_epoch + FLAGS['data_input_ext'], enhance_test_img2)
-                    cv2.imwrite(FLAGS['folder_test_img'] + 'B-' + test_image_name_list[i] + '-i' + now_epoch + FLAGS['data_input_ext'], enhance_test_img2_inv)
+                    cv2.imwrite(FLAGS['folder_test_img'] + 'A-' + test_image_name_list[i] + '-' + now_epoch + '.tif', enhance_test_img1)
+                    cv2.imwrite(FLAGS['folder_test_img'] + 'A-' + test_image_name_list[i] + '-i' + now_epoch +'.tif', enhance_test_img1_inv)
+                    cv2.imwrite(FLAGS['folder_test_img'] + 'B-' + test_image_name_list[i] + '-' + now_epoch + '.tif', enhance_test_img2)
+                    cv2.imwrite(FLAGS['folder_test_img'] + 'B-' + test_image_name_list[i] + '-i' + now_epoch +'.tif', enhance_test_img2_inv)
                 else:
                     assert False, 'not yet'
-                    cv2.imwrite(FLAGS['folder_test_img'] + test_image_name_list[i] + FLAGS['data_input_ext'], enhance_test_img)
-                    cv2.imwrite(FLAGS['folder_test_img'] + test_image_name_list[i] + '-i' + FLAGS['data_input_ext'], enhance_test_img_inv)
+                    cv2.imwrite(FLAGS['folder_test_img'] + test_image_name_list[i] + '.tif', enhance_test_img)
+                    cv2.imwrite(FLAGS['folder_test_img'] + test_image_name_list[i] + '-i' + '.tif', enhance_test_img_inv)
             else:
                 assert False, 'not yet'
                 test_s, enhance_test_img = sess.run([netG_test_summary, netG_test_output1_crop], feed_dict={t:d for t, d in zip(dict_t, dict_d)})
                 enhance_test_img = safe_casting(enhance_test_img * tf.as_dtype(FLAGS['data_input_dtype']).max, FLAGS['data_input_dtype'])
                 if is_training:
-                    cv2.imwrite(FLAGS['folder_test_img'] + test_image_name_list[i] + '-' + now_epoch + FLAGS['data_input_ext'], enhance_test_img)
+                    cv2.imwrite(FLAGS['folder_test_img'] + test_image_name_list[i] + '-' + now_epoch + '.tif', enhance_test_img)
                 else:
-                    cv2.imwrite(FLAGS['folder_test_img'] + test_image_name_list[i] + FLAGS['data_input_ext'], enhance_test_img)
+                    cv2.imwrite(FLAGS['folder_test_img'] + test_image_name_list[i] + '.tif', enhance_test_img)
             
             if FLAGS['mode_use_debug']:
                 print("i = %d, %s" % (i, str(timer2.end())))

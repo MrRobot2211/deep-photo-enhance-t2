@@ -2,21 +2,29 @@ import tensorflow as tf
 import numpy as np
 import random, cv2, operator, os
 
+from PIL import Image
 print(tf.config.list_physical_devices('GPU'))
 
 dir="/home/felipe/gans_enhancer/input/LPGAN/input/"
 def rename_MIT_files(dir):
 
+        # for file in os.listdir(dir):
+
+        #         os.rename(dir+file,dir+file.split("-")[0]+".tif")
+
+
         for file in os.listdir(dir):
 
-                os.rename(dir+file,dir+file.split("-")[0]+".tif")
+               
+                if file.split(".")[1] in ["jpg",'jpeg']:
 
+                        im = Image.open(dir+file)
+                        im.save(dir+file.split(".")[0]+".tif")
+                
+                else: 
+                        os.rename(dir+file,dir+file.split(".")[0]+".tif")
+                
 
-        for file in os.listdir(dir):
-
-                os.rename(dir+file,dir+file.split(".")[0]+".tif")
-
-from PIL import Image
 def resize_image(dir,max_length = 512) :
         for file in os.listdir(dir):
         
@@ -28,3 +36,10 @@ def resize_image(dir,max_length = 512) :
                 new_image = image.resize((int(factor*width), int(factor*height)), Image.ANTIALIAS)
                 image.close()
                 new_image.save(dir+file)
+
+if __name__ == '__main__':
+        #resize_image("/home/felipe/gans_enhancer/input/LPGAN/input/")
+        resize_image("/home/felipe/gans_enhancer/input/LPGAN/label/")
+        #rename_MIT_files("/home/felipe/gans_enhancer/input/LPGAN/input/")
+        rename_MIT_files("/home/felipe/gans_enhancer/input/LPGAN/label/")
+        print("done")

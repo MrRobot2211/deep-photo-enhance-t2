@@ -145,6 +145,8 @@ def get_netG_outputs(netG,train_df,test_df, FLAGS):
             with tf.compat.v1.variable_scope(netG.variable_scope_name + 'B') as scopeB:
                 netG_train_output2 = model(netG, train_df.input2, True, netG_act_o_1, is_first=True)
                 scopeB.reuse_variables()
+                
+                #not trainable
                 netG_test_output2  = model(netG, test_df.input2, False, netG_act_o_1)
                 netG_train_output2_for_netD = model(netG, train_df.input2, False, netG_act_o_1)
 
@@ -152,12 +154,19 @@ def get_netG_outputs(netG,train_df,test_df, FLAGS):
                 netG_train_output1 = model(netG, train_df.input1, True, netG_act_o_1, is_first=True)
                 scopeA.reuse_variables()
                 netG_test_output1  = model(netG, test_df.input1, False, netG_act_o_1)
+                
                 netG_train_output1_for_netD = model(netG, train_df.input1, False, netG_act_o_1)
+
+                # *_rec
                 netG_train_output2_inv = model(netG, tf.clip_by_value(netG_train_output2, 0, 1),  True, netG_act_o_2)
+
+
                 netG_test_output2_inv  = model(netG, tf.clip_by_value(netG_test_output2,  0, 1), False, netG_act_o_2)
+
 
             with tf.compat.v1.variable_scope(netG.variable_scope_name + 'B') as scopeB:
                 scopeB.reuse_variables()
+
                 netG_train_output1_inv = model(netG, tf.clip_by_value(netG_train_output1, 0, 1),  True, netG_act_o_2)
                 netG_test_output1_inv  = model(netG, tf.clip_by_value(netG_test_output1,  0, 1), False, netG_act_o_2)
     
@@ -198,6 +207,8 @@ def get_D_G_outputs(netD,netG,netG_train_outputs,netG_train_output_for_netD_list
                 netD_train_output2_1 = model(netD, train_df.input2, True, netD_act_o)
                 netD_netG_train_output1_1 = model(netD, netG_train_output1, True, netD_act_o)
                 netD_netG_train_output2_1 = netD_train_output2_1
+                
+                # test couple
                 netD_test_output1_1 = model(netD, netG_test_output1, False, netD_act_o)
                 netD_test_output2_1 = model(netD, test_df.input2, False, netD_act_o)
                 # wgan-gp
@@ -237,7 +248,7 @@ def get_D_G_outputs(netD,netG,netG_train_outputs,netG_train_output_for_netD_list
     gradient_penalties = [gradient_penalty_1,gradient_penalty_2]
 
     return  netD_train_outputs,netD_test_outputs,netD_netG_train_outputs, gradient_penalties
-
+#thi is the identity loss it is stange that the identity is enfoced fot the input with itself, it asks the generato to make bad_inputs from bad_inputs....duifferent fom cycle_gan that asks good_inpts from good_inputs
 def get_data_terms(netG_crops):
     netG_train_output1_crop,netG_train_output2_crop,netG_train_input1_crop,netG_train_input2_crop, netG_train_input1_label_crop, netG_train_input2_label_crop,netG_test_output1_crop,netG_test_output2_crop,netG_test_input1_crop,netG_test_input2_crop  =  netG_crops
     if FLAGS['loss_source_data_term_weight'] > 0:
@@ -366,6 +377,12 @@ def get_losses(netG_train_outputs , netG_test_outputs, train_df, test_df , netG_
    
 
     with tf.compat.v1.name_scope("Loss"):
+        #EXPLAIN     all images are processed and then transformed using the stored transformation masks for comparisons 
+
+
+
+
+
 
         netG_train_output1_crop = [tf_crop_rect(netG_train_output1, train_df.mat1, i) for i in range(FLAGS['data_train_batch_size'])]
         netG_train_output2_crop = [tf_crop_rect(netG_train_output2, train_df.mat2, i) for i in range(FLAGS['data_train_batch_size'])]

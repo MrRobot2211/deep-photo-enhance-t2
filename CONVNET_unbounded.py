@@ -12,8 +12,6 @@ PARAMETERS_NAME = ["conv_%d_w", \
                    "ln_%d_%d_offset", \
                    "ln_%d_%d_scale"]
 
-#tf.compat.v1.disable_resource_variables()
-
 #  .#####...######..##......##..##.
 #  .##..##..##......##......##..##.
 #  .#####...####....##......##..##.
@@ -41,9 +39,9 @@ def exe_prelu_layer(tensor, net_info, l_index, is_first, act_o):
     parameter_count = 1
     alphas_l = []
     for i in range(act_o['size']):
-        alphas = tf.compat.v1.get_variable(name=PARAMETERS_NAME[p_index] % (l_index, i), \
+        alphas = tf.get_variable(name=PARAMETERS_NAME[p_index] % (l_index, i), \
                                  shape=tensor.get_shape()[-1], \
-                                 initializer=tf.compat.v1.constant_initializer(0.0))
+                                 initializer=tf.constant_initializer(0.0))
         alphas_l.append(alphas)
     alphas = alphas_l[act_o['index']]
     pos = tf.nn.relu(tensor)
@@ -87,7 +85,7 @@ def exe_selu_layer(tensor):
     #alpha = 1.6732632423543772848170429916717
     #scale = 1.0507009873554804934193349852946
     alpha, scale = (1.0198755295894968, 1.0026538655307724)
-    return scale*tf.compat.v1.where(tensor>=0.0, tensor, alpha*tf.nn.elu(tensor))
+    return scale*tf.where(tensor>=0.0, tensor, alpha*tf.nn.elu(tensor))
     
 #  .#####...##..##.
 #  .##..##..###.##.
@@ -112,10 +110,10 @@ def exe_bn_layer(tensor, layer_o, net_info, l_index, is_first, is_training, trai
 
     pars = []
     for i in range(act_o['size']):
-        offset  = tf.compat.v1.get_variable(name=PARAMETERS_NAME[p_index  ] % (l_index, i), shape=shape, initializer=tf.compat.v1.constant_initializer(0.0), trainable=offset_trainable)
-        scale   = tf.compat.v1.get_variable(name=PARAMETERS_NAME[p_index+1] % (l_index, i), shape=shape, initializer=tf.compat.v1.constant_initializer(1.0), trainable=scale_trainable)
-        mv_mean = tf.compat.v1.get_variable(name=PARAMETERS_NAME[p_index+2] % (l_index, i), shape=shape, initializer=tf.compat.v1.constant_initializer(0.0), trainable=False)
-        mv_var  = tf.compat.v1.get_variable(name=PARAMETERS_NAME[p_index+3] % (l_index, i), shape=shape, initializer=tf.compat.v1.constant_initializer(1.0), trainable=False)
+        offset  = tf.get_variable(name=PARAMETERS_NAME[p_index  ] % (l_index, i), shape=shape, initializer=tf.constant_initializer(0.0), trainable=offset_trainable)
+        scale   = tf.get_variable(name=PARAMETERS_NAME[p_index+1] % (l_index, i), shape=shape, initializer=tf.constant_initializer(1.0), trainable=scale_trainable)
+        mv_mean = tf.get_variable(name=PARAMETERS_NAME[p_index+2] % (l_index, i), shape=shape, initializer=tf.constant_initializer(0.0), trainable=False)
+        mv_var  = tf.get_variable(name=PARAMETERS_NAME[p_index+3] % (l_index, i), shape=shape, initializer=tf.constant_initializer(1.0), trainable=False)
         pars.append([offset, scale, mv_mean, mv_var])
     offset, scale, mv_mean, mv_var = pars[act_o['index']]
 
@@ -126,10 +124,10 @@ def exe_bn_layer(tensor, layer_o, net_info, l_index, is_first, is_training, trai
             for j in range(act_o['size']):
                 net_info.parameter_names.append(PARAMETERS_NAME[p_index + i] % (l_index, j))
     if is_training:
-        batch_mean, batch_var = tf.nn.moments(x=tensor, axes=[0, 1, 2])
-        train_mean = tf.compat.v1.assign(mv_mean,
+        batch_mean, batch_var = tf.nn.moments(tensor, [0, 1, 2])
+        train_mean = tf.assign(mv_mean,
                                mv_mean * layer_o['decay'] + batch_mean * (1 - layer_o['decay']))
-        train_var  = tf.compat.v1.assign(mv_var,
+        train_var  = tf.assign(mv_var,
                                mv_var  * layer_o['decay'] + batch_var  * (1 - layer_o['decay']))
         with tf.control_dependencies([train_mean, train_var]):
             tensor = tf.nn.batch_normalization(tensor, batch_mean, batch_var, offset, scale, layer_o['epsilon'])
@@ -144,7 +142,6 @@ def exe_bn_layer(tensor, layer_o, net_info, l_index, is_first, is_training, trai
 #  ...##....##..##.
 #  .######..##..##.
 #  ................
-#individual layer norm
 def in_layer(use_offset=False, use_scale=False, epsilon=1e-5):
     return dict(
         name='in',
@@ -159,8 +156,8 @@ def exe_in_layer(tensor, layer_o, net_info, l_index, is_first, trainable, act_o)
     scale_trainable  = layer_o['use_scale']  if trainable else False
     pars = []
     for i in range(act_o['size']):
-        offset = tf.compat.v1.get_variable(name=PARAMETERS_NAME[p_index  ] % (l_index, i), shape=shape, initializer=tf.compat.v1.constant_initializer(0.0), trainable=offset_trainable)
-        scale  = tf.compat.v1.get_variable(name=PARAMETERS_NAME[p_index+1] % (l_index, i), shape=shape, initializer=tf.compat.v1.constant_initializer(1.0), trainable=scale_trainable)
+        offset = tf.get_variable(name=PARAMETERS_NAME[p_index  ] % (l_index, i), shape=shape, initializer=tf.constant_initializer(0.0), trainable=offset_trainable)
+        scale  = tf.get_variable(name=PARAMETERS_NAME[p_index+1] % (l_index, i), shape=shape, initializer=tf.constant_initializer(1.0), trainable=scale_trainable)
         pars.append([offset, scale])
     offset, scale = pars[act_o['index']]
 
@@ -172,20 +169,13 @@ def exe_in_layer(tensor, layer_o, net_info, l_index, is_first, trainable, act_o)
             for j in range(act_o['size']):
                 net_info.parameter_names.append(PARAMETERS_NAME[p_index + i] % (l_index, j))
 
-    t_list = tf.unstack(tensor)
+    t_list = tf.unpack(tensor)
     result = []
     for t in t_list:
-        batch_mean, batch_var = tf.nn.moments(x=t, axes=[0, 1])
+        batch_mean, batch_var = tf.nn.moments(t, [0, 1])
         t = tf.nn.batch_normalization(t, batch_mean, batch_var, offset, scale, layer_o['epsilon'])
         result.append(t)
-    return tf.stack(result)
-
-    # mean, variance = tf.nn.moments(tensor, axes=[1,2], keep_dims=True)
-    # epsilon = layer_o['epsilon']
-    # inv = tf.rsqrt(variance + epsilon)
-    # normalized = (tensor - mean)*inv
-    # return scale*normalized + offset
-    
+    return tf.pack(result)
     # mean, var = tf.nn.moments(tensor, [1, 2], keep_dims=True)
     # normalized = tf.div(tf.sub(tensor, mean), tf.sqrt(tf.add(var, layer_o['epsilon'])))
     # return scale * normalized + offset
@@ -210,8 +200,8 @@ def exe_ln_layer(tensor, layer_o, net_info, l_index, is_first, trainable, act_o)
     scale_trainable  = layer_o['use_scale']  if trainable else False
     pars = []
     for i in range(act_o['size']):
-        offset = tf.compat.v1.get_variable(name=PARAMETERS_NAME[p_index  ] % (l_index, i), shape=shape, initializer=tf.compat.v1.constant_initializer(0.0), trainable=offset_trainable)
-        scale  = tf.compat.v1.get_variable(name=PARAMETERS_NAME[p_index+1] % (l_index, i), shape=shape, initializer=tf.compat.v1.constant_initializer(1.0), trainable=scale_trainable)
+        offset = tf.get_variable(name=PARAMETERS_NAME[p_index  ] % (l_index, i), shape=shape, initializer=tf.constant_initializer(0.0), trainable=offset_trainable)
+        scale  = tf.get_variable(name=PARAMETERS_NAME[p_index+1] % (l_index, i), shape=shape, initializer=tf.constant_initializer(1.0), trainable=scale_trainable)
         pars.append([offset, scale])
     offset, scale = pars[act_o['index']]
 
@@ -222,7 +212,7 @@ def exe_ln_layer(tensor, layer_o, net_info, l_index, is_first, trainable, act_o)
         for i in range(parameter_count):
             for j in range(act_o['size']):
                 net_info.parameter_names.append(PARAMETERS_NAME[p_index + i] % (l_index, j))
-    mean, var = tf.nn.moments(x=tensor, axes=[1, 2, 3], keepdims=True)
+    mean, var = tf.nn.moments(tensor, [1, 2, 3], keep_dims=True)
     result = tf.nn.batch_normalization(tensor, mean, var, offset, scale, layer_o['epsilon'])
     return result
 
@@ -232,43 +222,63 @@ def exe_ln_layer(tensor, layer_o, net_info, l_index, is_first, trainable, act_o)
 #  .##..##..##..##..##..##...####..
 #  ..####....####...##..##....##...
 #  ................................
-def conv_layer(kernel, stride, filter, pad_mode, initializer, dropout=1, padding='VALID'):
+def conv_layer(kernel, stride, rate, filter, pad_mode, initializer, dropout=1, padding='VALID'):
     return dict(
         name='conv',
         kernel=kernel,
         stride=stride,
+        rate=rate,
         filter=filter,
         pad_mode=pad_mode,
         initializer=initializer,
         dropout=dropout,
         padding=padding)
 
-def exe_conv_layer(tensor, layer_o, net_info, l_index, is_first, is_training, trainable, seed):
+def exe_conv_layer(tensor, layer_o, net_info, l_index, is_first, is_training, trainable, seed, dilation_rate):
     p_index = 0
     parameter_count = 2
     kernel = layer_o['kernel']
     stride = layer_o['stride']
+    rate = layer_o['rate']
     filter = layer_o['filter']
     pad_mode = layer_o['pad_mode']
     dropout = layer_o['dropout']
     initializer = layer_o['initializer']
     padding = layer_o['padding']
-    conv_w = tf.compat.v1.get_variable(PARAMETERS_NAME[p_index  ] % l_index, \
+    conv_w_tmp = tf.get_variable(PARAMETERS_NAME[p_index  ] % l_index, \
                             [kernel, kernel, tensor.get_shape()[-1], filter], \
                             initializer=initializer, \
                             trainable=trainable)
-    conv_b = tf.compat.v1.get_variable(PARAMETERS_NAME[p_index+1] % l_index, \
+    conv_b = tf.get_variable(PARAMETERS_NAME[p_index+1] % l_index, \
                             [filter], \
-                            initializer=tf.compat.v1.constant_initializer(0), \
+                            initializer=tf.constant_initializer(0), \
                             trainable=trainable)
-    pad_size = (kernel - 1) // 2
-    if pad_size > 0 and pad_mode is not None:
-        tensor = tf.pad(tensor=tensor, paddings=[[0, 0], [pad_size, pad_size], [pad_size, pad_size], [0, 0]], mode=pad_mode)
-    if is_training and dropout < 1:
-        tensor = tf.nn.dropout(tensor, 1 - (dropout), seed=seed)
-    tensor = tf.nn.bias_add(tf.nn.conv2d(input=tensor, filters=conv_w, strides=[1,stride,stride,1], padding=padding), conv_b)
+    if dilation_rate is None:
+        #thi is the logic we need to add to the G infer model... the rest tays the same
+        conv_w = tf.reshape(conv_w_tmp, [1, kernel, kernel, -1])
+        conv_w = tf.image.resize_images(conv_w, [rate*(kernel-1)+1, rate*(kernel-1)+1], method=tf.image.ResizeMethod.AREA, align_corners=False)
+        conv_w = tf.reshape(conv_w, [rate*(kernel-1)+1, rate*(kernel-1)+1, tf.shape(tensor)[-1], filter])
+        conv_w = conv_w * kernel * kernel / tf.cast((rate*(kernel-1)+1) * (rate*(kernel-1)+1), tf.float32)
+
+        pad_size = rate * (kernel - 1) // 2
+        if kernel > 1 and pad_mode is not None:
+           tensor = tf.pad(tensor, [[0, 0], [pad_size, pad_size], [pad_size, pad_size], [0, 0]], pad_mode)
+        if is_training and dropout < 1:
+           tensor = tf.nn.dropout(tensor, dropout, seed=seed)
+        tensor = tf.nn.bias_add(tf.nn.conv2d(tensor, conv_w, strides=[1,stride,stride,1], padding=padding), conv_b)
+    else:
+        pad_size = dilation_rate * (kernel - 1) // 2
+        if kernel > 1 and pad_mode is not None:
+           tensor = tf.pad(tensor, [[0, 0], [pad_size, pad_size], [pad_size, pad_size], [0, 0]], pad_mode)
+        if is_training and dropout < 1:
+           tensor = tf.nn.dropout(tensor, dropout, seed=seed)
+           
+        tensor = tf.nn.bias_add(tf.nn.atrous_conv2d(tensor, conv_w_tmp, rate=dilation_rate, padding=padding), conv_b)
+        if stride > 1:
+            tensor = tf.image.resize_images(tensor, [tf.shape(tensor)[1]//stride, tf.shape(tensor)[2]//stride], method=tf.image.ResizeMethod.AREA, align_corners=False)
+
     if is_first:
-        net_info.weights.extend((conv_w, conv_b))
+        net_info.weights.extend((conv_w_tmp, conv_b))
         for i in range(parameter_count):
             net_info.parameter_names.append(PARAMETERS_NAME[p_index + i] % l_index)
     return tensor
@@ -300,17 +310,17 @@ def exe_conv_res_layer(res_tensor, layer_o, tensor_list, net_info, l_index, is_f
     padding = layer_o['padding']
     filter = res_tensor.get_shape()[-1]
     tensor = tensor_list[index]
-    conv_w = tf.compat.v1.get_variable(PARAMETERS_NAME[p_index  ] % l_index, \
+    conv_w = tf.get_variable(PARAMETERS_NAME[p_index  ] % l_index, \
                             [kernel, kernel, tensor.get_shape()[-1], filter], \
                             initializer=initializer, \
                             trainable=trainable)
-    conv_b = tf.compat.v1.get_variable(PARAMETERS_NAME[p_index+1] % l_index, \
+    conv_b = tf.get_variable(PARAMETERS_NAME[p_index+1] % l_index, \
                             [filter], \
-                            initializer=tf.compat.v1.constant_initializer(0), \
+                            initializer=tf.constant_initializer(0), \
                             trainable=trainable)
     if is_training and dropout < 1:
-        tensor = tf.nn.dropout(tensor, 1 - (dropout), seed=seed)
-    tensor = tf.nn.bias_add(tf.nn.conv2d(input=tensor, filters=conv_w, strides=[1,stride,stride,1], padding=padding), conv_b)
+        tensor = tf.nn.dropout(tensor, dropout, seed=seed)
+    tensor = tf.nn.bias_add(tf.nn.conv2d(tensor, conv_w, strides=[1,stride,stride,1], padding=padding), conv_b)
     if is_first:
         net_info.weights.extend((conv_w, conv_b))
         for i in range(parameter_count):
@@ -324,7 +334,7 @@ def exe_conv_res_layer(res_tensor, layer_o, tensor_list, net_info, l_index, is_f
 #  .##..##..##..........##....##....##..##..##..##..##..##..##.....
 #  .##..##..######...####...######..#####....####...##..##..######.
 #  ................................................................
-def res_layer(index, axis=None):
+def res_layer(index, axis):
     return dict(
         name='res',
         index=index,
@@ -334,9 +344,8 @@ def exe_res_layer(tensor, layer_o, tensor_list):
     index = layer_o['index']
     axis = layer_o['axis']
     res_tensor = tensor_list[index]
-    if axis is not None:
-        l = [res_tensor[:, :, :, i] for i in axis]
-        res_tensor = tf.stack(l, -1)
+    l = [res_tensor[:, :, :, i] for i in axis]
+    res_tensor = tf.pack(l, -1)
     tensor = tf.add(tensor, res_tensor)
     return tensor
 
@@ -357,7 +366,7 @@ def exe_max_pool_layer(tensor, layer_o):
     kernel = layer_o['kernel']
     stride = layer_o['stride']
     padding = layer_o['padding']
-    tensor = tf.nn.max_pool2d(input=tensor, ksize=[1, kernel, kernel, 1], strides=[1, stride, stride, 1], padding=padding)
+    tensor = tf.nn.max_pool(tensor, [1, kernel, kernel, 1], [1, stride, stride, 1], padding=padding)
     return tensor
 
 #  ..####...##..##...####...........#####....####....####...##.....
@@ -377,7 +386,7 @@ def exe_avg_pool_layer(tensor, layer_o):
     kernel = layer_o['kernel']
     stride = layer_o['stride']
     padding = layer_o['padding']
-    tensor = tf.nn.avg_pool2d(input=tensor, ksize=[1, kernel, kernel, 1], strides=[1, stride, stride, 1], padding=padding)
+    tensor = tf.nn.avg_pool(tensor, [1, kernel, kernel, 1], [1, stride, stride, 1], padding=padding)
     return tensor
 
 #  .#####...######...####...######..######..######.
@@ -399,9 +408,9 @@ def exe_resize_layer(tensor, layer_o):
     align_corners = layer_o['align_corners']
     t_shape = tensor.get_shape().as_list()
     if t_shape[1] == None or t_shape[2] == None:
-        t_shape = tf.shape(input=tensor)
+        t_shape = tf.shape(tensor)
     t_size = [t_shape[1] * scale, t_shape[2] * scale]
-    tensor = tf.image.resize(tensor, t_size, method=method)
+    tensor = tf.image.resize_images(tensor, t_size, method=method, align_corners=align_corners)
     return tensor
 
 #  ..####....####...##..##...####....####...######.
@@ -418,7 +427,7 @@ def concat_layer(index):
 def exe_concat_layer(tensor, layer_o, tensor_list):
     index = layer_o['index']
     concat_t = tensor_list[index]
-    tensor = tf.concat([tensor, concat_t],3)
+    tensor = tf.concat(3, [tensor, concat_t])
     return tensor
 
 #  ..####...##.......####...#####....####...##...............####....####...##..##...####....####...######.
@@ -434,21 +443,19 @@ def global_concat_layer(index):
 
 def exe_global_concat_layer(tensor, layer_o, tensor_list):
     index = layer_o['index']
-    h = tf.shape(input=tensor)[1]
-    w = tf.shape(input=tensor)[2]
+    h = tf.shape(tensor)[1]
+    w = tf.shape(tensor)[2]
     concat_t = tf.squeeze(tensor_list[index], [1, 2])
     dims = concat_t.get_shape()[-1]
-    #batch_l = tf.raw_ops.Unpack(concat_t, axis=0)
-    batch_l = tf.unstack(concat_t, axis=0)
+    batch_l = tf.unpack(concat_t, axis=0)
     bs = []
     for batch in batch_l:
         batch = tf.tile(batch, [h * w])
         batch = tf.reshape(batch, [h, w, -1])
         bs.append(batch)
-    #concat_t = tf.raw_ops.Pack(bs)
-    concat_t = tf.stack(bs)
-   
-   
+    concat_t = tf.pack(bs)
+    concat_t.set_shape(concat_t.get_shape().as_list()[:3] + [dims])
+    tensor = tf.concat(3, [tensor, concat_t])
     return tensor
 
 #  .#####...######...####...##..##...####...#####...######.
@@ -559,7 +566,7 @@ def inv_tanh_layer():
     return dict(name='inv_tanh')
 
 def exe_inv_tanh_layer(tensor):
-    return -tf.math.log((2.0 / (tensor + 1 + 1e-100)) - 1) * 0.5
+    return -tf.log((2.0 / (tensor + 1 + 1e-100)) - 1) * 0.5
 
 #  ..####...#####...#####..
 #  .##..##..##..##..##..##.
@@ -611,7 +618,7 @@ def reduce_mean_layer(axis=None, keep_dims=False):
 def exe_reduce_mean_layer(tensor, layer_o):
     axis = layer_o['axis']
     keep_dims = layer_o['keep_dims']
-    return tf.reduce_mean(input_tensor=tensor, axis=axis, keepdims=keep_dims)
+    return tf.reduce_mean(tensor, axis, keep_dims)
 
 #  .#####...######...####...######..#####...##..##...####...##..............#####...##.......####....####...##..##.
 #  .##..##..##......##........##....##..##..##..##..##..##..##..............##..##..##......##..##..##..##..##.##..
