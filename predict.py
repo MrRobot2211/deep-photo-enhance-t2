@@ -147,4 +147,5 @@ if __name__=='__main__':
     FLAGS['inference_folder'] = args.inference_dir
     tools.resize_image(FLAGS['inference_folder'])
     print('processing')
-    processImg('a0002.tif','totaltest')
+    for file in os.listdir(FLAGS['inference_folder']):
+        processImg(file,file.split(',')[0]+'out')
